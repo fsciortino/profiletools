@@ -1,15 +1,17 @@
+from builtins import zip
+from builtins import object
 import scipy
 import warnings
 import matplotlib.pyplot as plt
 try:
-    import eqtools
+    import eqtools3 as eqtools
 except ImportError:
     warnings.warn("Module eqtools could not be loaded!", RuntimeWarning)
 try:
-    import TRIPPy
+    import TRIPPy3 as TRIPPy
 except ImportError:
     warnings.warn("Module TRIPPy could not be loaded!", RuntimeWarning)
-import profiletools
+import profiletools3 as profiletools
 
 class ConversionWrapper(object):
     """Class to wrap a coordinate transform to avoid the overhead of using an anonymous (lambda) function.

@@ -19,6 +19,9 @@
 """
 
 from __future__ import division
+from builtins import zip
+from builtins import range
+from builtins import object
 
 import scipy
 import scipy.stats
@@ -26,7 +29,7 @@ import scipy.io
 import scipy.linalg
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import gptools
+import gptools3 as gptools
 import sys
 import os.path
 import csv
@@ -553,6 +556,13 @@ class Profile(object):
                 "Dependent variables y must have only one dimension! Shape of y "
                 "given is %s" % (y.shape,)
             )
+
+        #from IPython import embed
+        #embed()
+
+        # FS: some new error with nan's in err_y...
+        # Should be fine to set those nan's to 0:
+        err_y[scipy.isnan(err_y)] = 0.0
         
         # Handle scalar error or verify shape of array error matches shape of y:
         try:
@@ -784,7 +794,7 @@ class Profile(object):
             y = scipy.zeros(len(channels))
             err_X = scipy.zeros_like(X)
             err_y = scipy.zeros_like(y)
-            for i, chan in zip(range(0, len(channels)), channels):
+            for i, chan in zip(list(range(0, len(channels))), channels):
                 chan_mask = (
                     reduced_channels == chan.flatten()
                 ).all(axis=1)
@@ -1004,7 +1014,7 @@ class Profile(object):
         # Handle transformed points:
         if check_transformed:
             bad_transformed = scipy.zeros_like(self.transformed, dtype=Channel)
-            for k, pt in zip(range(0, len(self.transformed)), self.transformed):
+            for k, pt in zip(list(range(0, len(self.transformed))), self.transformed):
                 mean = self.gp.predict(
                     scipy.vstack(pt.X),
                     return_std=False,
@@ -1176,7 +1186,7 @@ class Profile(object):
         elif k is None or k == 'SE':
             y_range = y.max() - y.min()
             bounds = [(0.0, upper_factor * y_range)]
-            for i in xrange(0, self.X_dim):
+            for i in range(0, self.X_dim):
                 X_range = X[:, i].max() - X[:, i].min()
                 bounds.append((0.0, upper_factor * X_range))
             initial = [(b[1] - b[0]) / 2.0 for b in bounds]
@@ -1278,7 +1288,7 @@ class Profile(object):
         elif k == 'RQ':
             y_range = y.max() - y.min()
             bounds = [(0.0, upper_factor * y_range), (0.0, 1e2)]
-            for i in xrange(0, self.X_dim):
+            for i in range(0, self.X_dim):
                 X_range = X[:, i].max() - X[:, i].min()
                 bounds.append((0, upper_factor * X_range))
             initial = [(b[1] - b[0]) / 2.0 for b in bounds]
@@ -1296,7 +1306,7 @@ class Profile(object):
                 raise ValueError("Symmetric SE kernel only supported for univariate data!")
             y_range = y.max() - y.min()
             bounds = [(0.0, upper_factor * y_range)]
-            for i in xrange(0, self.X_dim):
+            for i in range(0, self.X_dim):
                 X_range = X[:, i].max() - X[:, i].min()
                 bounds.append((0.0, upper_factor * X_range))
             initial = [(b[1] - b[0]) / 2.0 for b in bounds]
@@ -1313,7 +1323,7 @@ class Profile(object):
             # TODO: Add support for k_kwargs on warp steps!
             y_range = y.max() - y.min()
             bounds = [(0.0, upper_factor * y_range)]
-            for i in xrange(0, self.X_dim):
+            for i in range(0, self.X_dim):
                 X_range = X[:, i].max() - X[:, i].min()
                 bounds.append((0.0, upper_factor * X_range))
             initial = [(b[1] - b[0]) / 2.0 for b in bounds]
@@ -1331,7 +1341,7 @@ class Profile(object):
         elif k == 'matern':
             y_range = y.max() - y.min()
             bounds = [(0.0, upper_factor * y_range), (1.0, 50)]
-            for i in xrange(0, self.X_dim):
+            for i in range(0, self.X_dim):
                 X_range = X[:, i].max() - X[:, i].min()
                 bounds.append((0.0, upper_factor * X_range))
             initial = [(b[1] - b[0]) / 2.0 for b in bounds]
@@ -1344,7 +1354,7 @@ class Profile(object):
         elif k == 'matern52':
             y_range = y.max() - y.min()
             bounds = [(0.0, upper_factor * y_range)]
-            for i in xrange(0, self.X_dim):
+            for i in range(0, self.X_dim):
                 X_range = X[:, i].max() - X[:, i].min()
                 bounds.append((0.0, upper_factor * X_range))
             initial = [(b[1] - b[0]) / 2.0 for b in bounds]
@@ -1357,7 +1367,7 @@ class Profile(object):
         elif k == 'matern52beta':
             y_range = y.max() - y.min()
             bounds = [(0.0, upper_factor * y_range)]
-            for i in xrange(0, self.X_dim):
+            for i in range(0, self.X_dim):
                 X_range = X[:, i].max() - X[:, i].min()
                 bounds.append((0.0, upper_factor * X_range))
             initial = [(b[1] - b[0]) / 2.0 for b in bounds]
@@ -1535,7 +1545,7 @@ class Profile(object):
             writer.writerow(self.X_labels + err_X_labels +
                             [self.y_label + ' [' + self.y_units + ']'] +
                             ['err_' + self.y_label])
-            for k in xrange(0, len(self.y)):
+            for k in range(0, len(self.y)):
                 writer.writerow(
                     [x for x in X[k, :]] + [x for x in err_X[k, :]] + [y[k], err_y[k]]
                 )
@@ -1597,7 +1607,7 @@ def read_csv(filename, X_names=None, y_name=None, metadata_lines=None):
             else:
                 metadata_lines = 0
             infile.seek(0)
-        for k in xrange(0, metadata_lines):
+        for k in range(0, metadata_lines):
             metadata.append(infile.readline())
         if not (X_names and y_name):
             X_names = infile.readline().split(',')
@@ -1605,7 +1615,7 @@ def read_csv(filename, X_names=None, y_name=None, metadata_lines=None):
             y_name = X_names.pop(-1)
             infile.seek(0)
             # Need to skip the metadata again:
-            for k in xrange(0, metadata_lines):
+            for k in range(0, metadata_lines):
                 infile.readline()
         rdr = csv.DictReader(infile)
         for row in rdr:
@@ -1807,10 +1817,10 @@ def unique_rows(arr):
     except TypeError:
         # Handle bug in numpy 1.6.2:
         rows = [_Row(row) for row in b]
-        srt_idx = sorted(range(len(rows)), key=rows.__getitem__)
+        srt_idx = sorted(list(range(len(rows))), key=rows.__getitem__)
         rows = scipy.asarray(rows)[srt_idx]
         row_cmp = [-1]
-        for k in xrange(1, len(srt_idx)):
+        for k in range(1, len(srt_idx)):
             row_cmp.append(rows[k-1].__cmp__(rows[k]))
         row_cmp = scipy.asarray(row_cmp)
         transition_idxs = scipy.where(row_cmp != 0)[0]
@@ -2055,13 +2065,13 @@ def medianw(x, weights=None, axis=None):
             return scoreatpercentilew(x, 50, weights)[0]
         elif axis == 0 and x.ndim == 3:
             out = scipy.zeros_like(x[0])
-            for i in xrange(0, out.shape[0]):
-                for j in xrange(0, out.shape[1]):
+            for i in range(0, out.shape[0]):
+                for j in range(0, out.shape[1]):
                     out[i, j] = scoreatpercentilew(x[:, i, j], 50, weights)
             return out
         elif axis == 0 and x.ndim == 2:
             out = scipy.zeros(x.shape[1])
-            for i in xrange(0, len(out)):
+            for i in range(0, len(out)):
                 out[i] = scoreatpercentilew(x[:, i], 50, weights)
             return out
         else:
@@ -2093,8 +2103,8 @@ def robust_stdw(x, weights=None, axis=None):
         elif axis == 0 and x.ndim == 3:
             lq = scipy.zeros_like(x[0])
             uq = scipy.zeros_like(x[0])
-            for i in xrange(0, lq.shape[0]):
-                for j in xrange(0, lq.shape[1]):
+            for i in range(0, lq.shape[0]):
+                for j in range(0, lq.shape[1]):
                     lqij, uqij = scoreatpercentilew(x[:, i, j], [25, 75], weights)
                     lq[i, j] = lqij
                     uq[i, j] = uqij
@@ -2102,7 +2112,7 @@ def robust_stdw(x, weights=None, axis=None):
         elif axis == 0 and x.ndim == 2:
             lq = scipy.atleast_1d(scipy.zeros(x.shape[1]))
             uq = scipy.atleast_1d(scipy.zeros(x.shape[1]))
-            for i in xrange(0, len(lq)):
+            for i in range(0, len(lq)):
                 lqi, uqi = scoreatpercentilew(x[:, i], [25, 75], weights)
                 lq[i] = lqi
                 uq[i] = uqi

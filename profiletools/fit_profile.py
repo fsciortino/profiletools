@@ -20,14 +20,13 @@ from __future__ import division
 from __future__ import print_function
 from future import standard_library
 standard_library.install_aliases()
-from builtins import map
 from builtins import next
 from builtins import str
 from builtins import zip
 from builtins import range
 
-__version__ = '1.1.3'
-PROG_NAME = 'gpfit'
+__version__ = '0.0'
+PROG_NAME = 'fit_profile'
 
 import collections
 
@@ -47,7 +46,7 @@ for sig, sys in SYSTEM_OPTIONS.items():
 valid_systems.add('TS')
 
 # Define which systems are excluded by default:
-DEFAULT_EXCLUDE = ['TCI', 'reflect', 'Mic']
+DEFAULT_EXCLUDE = ['TCI', 'reflect']
 
 # Define the coordinates that can be specified:
 COORDINATE_OPTIONS = [
@@ -61,12 +60,6 @@ METHOD_OPTIONS = ['conventional', 'robust', 'all points']
 # Define uncertainty methods available. First entry is default.
 ERROR_METHOD_OPTIONS = ['sample', 'RMS', 'total', 'of mean', 'of mean sample']
 
-# Define uncertainty fudging methods available. First entry is default.
-FUDGE_METHOD_OPTIONS = ['override', 'minimum', 'add']
-
-# Define unceratinty fudging types available. First entry is default.
-FUDGE_TYPE_OPTIONS = ['absolute', 'relative']
-
 # Make form suitable for command line entry:
 error_method_cl = [s.replace(' ', '_') for s in ERROR_METHOD_OPTIONS]
 
@@ -77,46 +70,46 @@ HYPERPARAMETERS = collections.OrderedDict([
         'gibbstanh',
         collections.OrderedDict([
             (u"\u03C3f", "signal variance"),
-            (u"\u21131", "core length scale"),
-            (u"\u21132", "edge length scale"),
-            (u"\u2113w", "transition width"),
-            (u"x0", "transition location")
+            (u"\u21131", "core covariance length scale"),
+            (u"\u21132", "edge covariance length scale"),
+            (u"\u2113w", "core/edge transition width"),
+            (u"x0", "core/edge transition location")
         ])
     ),
     (
         'gibbsdoubletanh',
         collections.OrderedDict([
             (u"\u03C3f", "signal variance"),
-            (u"\u2113c", "core length scale"),
-            (u"\u2113m", "mid length scale"),
-            (u"\u2113e", "edge length scale"),
+            (u"\u2113c", "core covariance length scale"),
+            (u"\u2113m", "mid covariance length scale"),
+            (u"\u2113e", "edge covariance length scale"),
             (u"\u2113a", "first transition width"),
             (u"\u2113b", "second transition width"),
-            (u"xa", "first transition"),
-            (u"xb", "second transition")
+            ("xa", "first transition"),
+            ("xb", "second transition")
         ])
     ),
     (
         'SE',
         collections.OrderedDict([
             (u"\u03C3f", "signal variance"),
-            (u"\u2113", "length scale"),
+            (u"\u2113", "covariance length scale"),
         ])
     ),
     (
         'SEsym1d',
         collections.OrderedDict([
-            (u"1", "VOID"),
-            (u"2", "VOID"),
-            (u"\u03C3f", "signal variance"),
-            (u"\u2113", "length scale")
+            ("1", "VOID"),
+            ("2", "VOID"),
+            (u"\u03C3f 2", "signal variance"),
+            (u"\u2113 2", "covariance length scale")
         ])
     ),
     (
         'SEbeta',
         collections.OrderedDict([
             (u"\u03C3f", "signal variance"),
-            (u"\u2113", "length scale"),
+            (u"\u2113", "covariance length scale"),
             (u"\u03B1", "warping alpha"),
             (u"\u03B2", "warping beta")
         ])
@@ -125,8 +118,8 @@ HYPERPARAMETERS = collections.OrderedDict([
         'RQ',
         collections.OrderedDict([
             (u"\u03C3f", "signal variance"),
-            (u"a", "order"),
-            (u"\u2113", "length scale")
+            (u"\u03B1", "order"),
+            (u"\u2113", "covariance length scale")
         ])
     ),
     (
@@ -134,94 +127,32 @@ HYPERPARAMETERS = collections.OrderedDict([
         collections.OrderedDict([
             (u"\u03C3f", "signal variance"),
             (u"\u03BD", "order"),
-            (u"\u2113", "length scale")
+            (u"\u2113", "covariance length scale")
         ])
     ),
     (
         'matern52',
         collections.OrderedDict([
             (u"\u03C3f", "signal variance"),
-            (u"\u2113", "length scale")
+            (u"\u2113", "covariance length scale")
         ])
     ),
     (
         'matern52beta',
         collections.OrderedDict([
             (u"\u03C3f", "signal variance"),
-            (u"\u2113", "length scale"),
+            (u"\u2113", "covariance length scale"),
             (u"\u03B1", "warping alpha"),
             (u"\u03B2", "warping beta")
         ])
     ),
 ])
 
-# Define the (univariate) hyperpriors and their (hyperhyper)parameters:
-HYPERPRIORS = collections.OrderedDict(
-    [
-        ('uniform', [u"lb", u"ub"]),
-        ('gamma', [u"\u03b1", u"\u03b2"]),
-        ('alt-gamma', [u"m", u"\u03c3"]),
-        ('normal', [u"\u03bc", u"\u03c3"]),
-        ('log-normal', [u"\u03bc", u"\u03c3"]),
-    ]
-)
-
-# Define some (vaguely) sensible defaults for the hyperpriors:
-# Key is the (unicode) short name for the hyperparameter (as used as a key in
-# the inner dictionaries of HYPERPARAMETERS, above).
-# Value is a tuple with ('name', [p1, p2, ...]) (i.e., a key-value pair ordered
-# like in HYPERPRIORS above, but with the specific initial values given for the
-# hyperhyperparameters).
-HYPERPRIOR_DEFAULTS = {
-    u"\u03C3f": ('uniform', [0.0, 20.0]),
-    u"\u21131": ('alt-gamma', [1.0, 0.3]),
-    u"\u21132": ('alt-gamma', [0.5, 0.25]),
-    u"\u2113w": ('alt-gamma', [0.0, 0.1]),
-    u"x0": ('alt-gamma', [1.0, 0.1]),
-    u"\u2113c": ('alt-gamma', [1.0, 0.3]),
-    u"\u2113m": ('alt-gamma', [1.0, 0.3]),
-    u"\u2113e": ('alt-gamma', [0.5, 0.25]),
-    u"\u2113a": ('alt-gamma', [0.0, 0.1]),
-    u"\u2113b": ('alt-gamma', [0.0, 0.1]),
-    u"xa": ('uniform', [0.0, 1.0]),
-    u"xb": ('alt-gamma', [1.0, 0.1]),
-    u"\u2113": ('alt-gamma', [1.0, 0.3]),
-    u"1": ('uniform', [0.0, 20.0]),
-    u"2": ('alt-gamma', [1.0, 0.3]),
-    u"\u03B1": ('log-normal', [0.0, 0.25]),
-    u"\u03B2": ('log-normal', [1.0, 1.0]),
-    u"a": ('uniform', [0.0, 100.0]),
-    u"\u03BD": ('uniform', [1.0, 50.0])
-}
-
-# Define ASCII-only names for the hyperparameters:
-HYPERPARAMETER_NAMES = collections.OrderedDict(
-    [
-        ('sigma_f', u"\u03C3f"),
-        ('l_1', u"\u21131"),
-        ('l_2', u"\u21132"),
-        ('l_w', u"\u2113w"),
-        ('x_0', u"x0"),
-        ('l_c', u"\u2113c"),
-        ('l_m', u"\u2113m"),
-        ('l_e', u"\u2113e"),
-        ('l_a', u"\u2113a"),
-        ('l_b', u"\u2113b"),
-        ('x_a', u"xa"),
-        ('x_b', u"xb"),
-        ('l', u"\u2113"),
-        ('alpha', u"\u03B1"),
-        ('beta', u"\u03B2"),
-        ('a', u"a"),
-        ('nu', u"\u03BD")
-    ]
-)
-
 # Configure and parse command line arguments:
 import argparse
 
-# class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
-#     pass
+class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
+    pass
 
 parser = argparse.ArgumentParser(
     description="""Fit univariate profile using gptools/profiletools.
@@ -305,589 +236,419 @@ of the file. The supported metadata are:
                     sqrtvolnorm,sqrtphinorm}
         ========== =======================================================
 """ % (PROG_NAME, PROG_NAME,),
-    formatter_class=argparse.RawDescriptionHelpFormatter
-)
-parser.add_argument(
-    '--signal',
-    choices=list(SYSTEM_OPTIONS.keys()),
-    help="Which signal to fit when pulling data from the tree."
-)
-parser.add_argument(
-    '--shot',
-    type=int,
-    help="Shot number to use. Required when pulling data from the tree. When "
-         "pulling data from a file, this is needed to specify constraints at the "
-         "magnetic axis and limiter."
-)
-parser.add_argument(
-    '--EFIT-tree',
-    help="EFIT tree to use. Default is ANALYSIS. Otherwise, give a name like "
-         "'EFIT20'."
-)
-parser.add_argument(
-    '--t-min',
-    type=float,
-    help="Starting time of period to average over. If you are reading data from "
-         "a file, you can set this flag to tell the program what time window to "
-         "average over when finding the location of the limiter/magnetic axis "
-         "when applying constraints."
-)
-parser.add_argument(
-    '--t-max',
-    type=float,
-    help="Ending time of period to average over. If you are reading data from a "
-         "file, you can set this flag to tell the program what time window to "
-         "average over when finding the location of the limiter/magnetic axis "
-         "when applying constraints."
-)
-parser.add_argument(
-    '-t', '--t-points',
-    type=float,
-    metavar='T_POINT',
-    nargs='+',
-    help="Individual time values to use. The nearest time to each will be "
-         "selected for each channel. You can use this, for instance, to specify "
-         "the times you have determined are at a particular sawtooth/ELM phase. "
-         "You must either specify --t-min and --t-max, or -t."
-)
-parser.add_argument(
-    '--t-tol',
-    type=float,
-    help="Tolerance for how close a point must be to a value in '--t-points' to "
-         "be included. Default is to allow points to be arbitrarily far away."
-)
-parser.add_argument(
-    '--npts',
-    type=int,
-    # default=400,
-    help="Number of evenly-spaced points to evaluate the fit at. Default is 400."
-)
-parser.add_argument(
-    '--x-min',
-    type=float,
-    # default=0,
-    help="Starting point for the evenly-spaced points to evaluate the fit at. "
-         "Default is 0.0."
-)
-parser.add_argument(
-    '--x-max',
-    type=float,
-    # default=1.2,
-    help="Ending point for the evenly-spaced points to evaluate the fit at. "
-         "Default is 1.2."
-)
-parser.add_argument(
-    '--x-pts',
-    type=float,
-    metavar='X_PT',
-    nargs='+',
-    help="Discrete points to evaluate the fit at. If present, this overrides the "
-         "effect of npts, x-min and x-max."
-)
-parser.add_argument(
-    '--system',
-    nargs='+',
-    choices=valid_systems,
-    help="Which system(s) to take data from. If not provided, all applicable "
-         "systems will be used. The 'TS' option is a shortcut to include both "
-         "the core (CTS) and edge (ETS) Thomson systems. Note that working with "
-         "TCI data is rather slow. Also note that the statistics of including "
-         "the SOL reflectometer are questionable, so your uncertainties should "
-         "be taken with a grain of salt when using those data."
-)
-parser.add_argument(
-    '--TCI-quad-points',
-    type=int,
-    # default=100,
-    help="Number of quadrature points to use when approximating the TCI line "
-         "integrals. The higher this number is, the more accurate the "
-         "integration will be, but the slower all operations on the Gaussian "
-         "process will be. The default of 100 is a preliminary, conservative "
-         "estimate of the minimum necessary to perform an accurate fit."
-)
-parser.add_argument(
-    '--TCI-thin',
-    type=int,
-    # default=1,
-    help="Amount by which the TCI data are thinned. The TCI data taken at a much "
-         "higher time resolution than most applications need. This will allow "
-         "you to skip some samples when performing the very "
-         "computationally-expensive computation of the quadrature weights. Note "
-         "that this takes effect during the loading of the data, so to reverse "
-         "this you will have to reload all data. Default is 1 (no thinning)."
-)
-parser.add_argument(
-    '--TCI-ds',
-    type=float,
-    # default=1e-3,
-    help="Step size (in m) to use when constructing the TCI quadrature weights. "
-         "The smaller this is the more accurate the integration will be, but at "
-         "the expense of making the loading of the TCI data take much longer. "
-         "The default value of 1e-3 is what is recommended by TRIPPy and is "
-         "somewhat conservative."
-)
-parser.add_argument(
-    '--kernel',
-    choices=list(HYPERPARAMETERS.keys()),
-    # default='gibbstanh',
-    help="Which covariance kernel to use. This dictates the properties of the "
-         "fit. "
-         "* gibbstanh is the Gibbs kernel with tanh warping of the length scale. "
-         "This kernel allows the entire profile to be fit at once, and should be "
-         "used if you have edge data. "
-         "* gibbsdoubletanh is an experimental Gibbs kernel whose warping "
-         "function is the sum of two hyperbolic tangents. This may be useful for "
-         "whole profiles with complicated shapes. "
-         "* SE is the squared exponential kernel, which is good for core data. "
-         "* SEsym1d is an experimental SE kernel with symmetry constraint "
-         "imposed by construction. This is primarily useful for core data. "
-         "* SEbeta is an experimental SE kernel whose arguments are warped using "
-         "the regularized incomplete beta function. This is good when you have "
-         "edge data. "
-         "* RQ is the rational quadratic kernel, good for core data. "
-         "* matern is the Matern kernel, which is also potentially useful for "
-         "core data. Note that the matern kernel is VERY SLOW to evaluate, "
-         "particularly if you need gradients. "
-         "* matern52 is a task-specific implementation of the Matern kernel with "
-         "the order fixed at nu=5/2. This is MUCH faster than the basic matern. "
-         "This is mostly suitable for core data. "
-         "* matern52beta is the same as matern52, but with the same warping as "
-         "SEbeta applied. This is potentially suitable for fitting entire "
-         "profiles. "
-         "You will typically want to set --no-edge-constraint and/or --core-only "
-         "if you specify any kernel other gibbstanh and gibbsdoubletanh. See "
-         "also --core-only. The default is gibbstanh, or SE if --core-only is "
-         "set."
-)
-parser.add_argument(
-    '--coordinate',
-    choices=COORDINATE_OPTIONS,
-    # default='',
-    help="Which coordinate to fit against. Defaults to r/a when pulling data "
-         "from the tree. Used to determine how to apply core/edge constraints "
-         "when pulling data from a file."
-)
-parser.add_argument(
-    '--no-core-constraint',
-    action='store_true',
-    help="Set this flag to disable the slope=0 constraint at the magnetic axis."
-)
-parser.add_argument(
-    '--no-edge-constraint',
-    action='store_true',
-    help="Set this flag to disable the slope, value=0 constraint at/outside the "
-         "GH limiter."
-)
-parser.add_argument(
-    '--core-constraint-location',
-    type=float,
-    metavar='LOC',
-    nargs='+',
-    help="Location to impose slope=0 constraint at. Typically this is the "
-         "magnetic axis. If you specify a shot number and times then this will "
-         "be found automatically, but you can override it with this flag. Note "
-         "that you can specify multiple locations if you want to have multiple "
-         "points where the slope goes to exactly zero."
-)
-parser.add_argument(
-    '--edge-constraint-locations',
-    type=float,
-    metavar='LOC',
-    nargs='+',
-    help="Location to impose slope~0, value~0 constraints at. Typically this is "
-         "at the location of the GH limiter. If you specify a shot number and "
-         "times then this will be found automatically, but you can override it "
-         "with this flag. It helps to specify a couple of points outside the GH "
-         "limiter, as well."
-)
-parser.add_argument(
-    '--core-only',
-    action='store_true',
-    help="Set this flag to only fit the data inside the LCFS. This will switch "
-         "to using a squared exponential kernel, and will disable the edge value, "
-         "slope constraints."
-)
-parser.add_argument(
-    '--robust',
-    action='store_true',
-    help="Set this flag to use robust estimators (median, IQR) when performing "
-         "time-averages. Note that using robust weighted estimators will not "
-         "work for small numbers of data points."
-)
-parser.add_argument(
-    '--uncertainty-method',
-    choices=error_method_cl,
-    # default='sample',
-    help="Method by which the uncertainty should be propagated when "
-         "time-averaging. "
-         "* sample (the default) will take the sample standard deviation, and is "
-         "usually appropriate for cases where you have many points to average "
-         "over and the data are not completely stationary in time. "
-         "* RMS uses the root-mean-square standard deviation, and is appropriate "
-         "for small sample sizes. Note that this is questionable when applied to "
-         "diagnostics other than TS for which the individual error bars are "
-         "estimated as some fixed percent of the value. "
-         "* total uses the law of total variance which is the square root of the "
-         "sum of the mean square uncertainty and sample variance. This is "
-         "appropriate when the given points already represent actual sample "
-         "means/variances. "
-         "* of_mean uses the uncertainty in the mean using the individual error "
-         "bars on the points, and is only appropriate if the data are steady in "
-         "time. It is very questionable to use this with robust estimators."
-         "* of_mean_sample uses the uncertainty in the mean using the sample "
-         "standard deviation, and is only appropriate if the data are steady in "
-         "time. It is very questionable to use this with robust estimators."
-)
-parser.add_argument(
-    '--unweighted',
-    action='store_true',
-    help="Set this flag to use unweighted estimators when averaging the data. "
-         "Otherwise the weights used are 1/sigma_i^2. Note that using robust "
-         "weighted estimators will not work for small numbers of data points. "
-         "Note that weighting is only ever applied to diagnostics like CTS and "
-         "ETS for which there are computed error bars in the tree."
-)
-parser.add_argument(
-    '--all-points', '--no-average',
-    action='store_true',
-    help="Set this flag to keep all points from the time window selected instead "
-         "of performing a time average. This will make the fit take longer and "
-         "is statistically questionable, but may be useful in some cases."
-)
-parser.add_argument(
-    '--uncertainty-adjust-value',
-    type=float,
-    help="The value by which the uncertainty is adjusted (if at all). Use "
-         "--uncertainty-adjust-method to pick how this value is employed and "
-         "--uncertainty-adjust-type to indicate whether this is an absolute or "
-         "relative uncertainty."
-)
-parser.add_argument(
-    '--uncertainty-adjust-method',
-    choices=FUDGE_METHOD_OPTIONS,
-    help="The method by which the uncertainty is adjusted. "
-         "* override will override all of the uncertainties with the given value. "
-         "* minimum will only override uncertainties which are smaller than the "
-         " given value. "
-         "* add will add the given uncertainty (in quadrature) to the uncertainty "
-         "computed in the usual manner. "
-         "Default is %s." % (FUDGE_METHOD_OPTIONS[0],)
-)
-parser.add_argument(
-    '--uncertainty-adjust-type',
-    choices=FUDGE_TYPE_OPTIONS,
-    help="The type of uncertainty (relative or absolute) that is specified with "
-         "--uncertainty-adjust-value. Default is %s." % (FUDGE_TYPE_OPTIONS[0],)
-)
-parser.add_argument(
-    '--change-threshold',
-    type=float,
-    help="If provided, any points whose differences with respect to either of "
-         "their neighbors are more than this many times their own error bar will "
-         "be rejected. This is useful for getting rid of bad channels. A value "
-         "of 9 is often useful. Note that this does not take into account the "
-         "uncertainties on the neighbors -- it is primarily designed to catch "
-         "bad channels that don't get caught by the method employed by "
-         "--outlier-threshold. This can lead to good data getting thrown out if "
-         "the threshold is too low."
-)
-parser.add_argument(
-    '--outlier-threshold',
-    type=float,
-    help="If provided, any points whose values are more than this many times "
-         "their own error bar outside of the fit will be rejected. A value of 3 "
-         "is often useful. Note that this can get thrown off by extremely bad "
-         "channels that drag the whole fit off."
-)
-parser.add_argument(
-    '--remove-points',
-    type=int,
-    nargs='+',
-    help="Indices of points to remove. These are the indices in the combined "
-         "Profile object. These will usually be the same from shot-to-shot, but "
-         "may change if entire channels are removed during data loading. Use "
-         "--plot-idxs to see the indices to use."
-)
-parser.add_argument(
-    '--plot-idxs',
-    action='store_true',
-    help="Set this flag to overplot the indices of the points. These are the "
-         "indices to use with --remove-points."
-)
-parser.add_argument(
-    '--random-starts',
-    type=int,
-    help="The number of random starts to use when trying to find the MAP "
-         "estimate for the hyperparameters. If you are getting bad fits, try "
-         "increasing this. If not specified, this is set to the number of "
-         "processors available on your machine or 20, whichever is smaller."
-)
-parser.add_argument(
-    '--bounds',
-    type=float,
-    nargs='+',
-    help="Bounds to use for each of the hyperparameters. Specified as pairs of "
-         "lower, upper bounds. Causes uniform hyperpriors to be used for all "
-         "hyperparameters. If present, there should be two such pairs for the "
-         "squared exponential kernel and five such pairs for the Gibbs kernel "
-         "with tanh length scale warping. If not specified, somewhat intelligent "
-         "guesses are made. If you are getting bad fits, try tweaking these. "
-         "Note that this is overridden by --hyperprior if present."
-)
-parser.add_argument(
-    '--hyperprior',
-    nargs='+',
-    help="Specifies the (hyper)prior to use for some or all of the "
-         "hyperparameters. This flag should be followed by one or more "
-         "specifications of the form: '[NAME] [TYPE] [p1] [p2] ...' where [NAME] "
-         "is the hyperparameter name (one of {{{names}}}), [TYPE] is the type of "
-         "prior distribution to use for the hyperparameter (one of "
-         "{{{distributions}}}) and [p1], [p2] and so on are the values for the "
-         "parameters of the distribution. An example of this is "
-         "'--hyperprior sigma_f uniform 0 20' which sets the hyperprior on the "
-         "signal variance to be uniform between 0 and 20. If present, this "
-         "overrides --bounds. If not present, reasonable guesses will be used.".format(
-             names=', '.join(map(str, list(HYPERPARAMETER_NAMES.keys()))),
-             distributions=', '.join(map(str, list(HYPERPRIORS.keys())))
-         )
-)
-parser.add_argument(
-    '--use-MCMC',
-    action='store_true',
-    help="Set this flag to use MCMC integration over the hyperparameters instead "
-         "of MAP estimation. This is the most rigorous way of capturing all "
-         "uncertainty, and should always be used if you are interested in "
-         "gradients and/or the details of the edge. Note that this is very "
-         "computationally expensive, but benefits strongly from having many "
-         "cores to run on."
-)
-parser.add_argument(
-    '--walkers',
-    type=int,
-    # default=200,
-    help="The number of walkers to use to explore the parameter space. This "
-         "number should be high, on the order of a few hundred. If you are "
-         "getting poor mixing of the MCMC integration, try increasing this by a "
-         "hundred at a time. Default is 200."
-)
-parser.add_argument(
-    '--MCMC-samp',
-    type=int,
-    # default=200,
-    help="The number of samples to take with each walker. The default of 200 is "
-         "a good number to get a look at the sample space and dial in the bounds."
-)
-parser.add_argument(
-    '--burn',
-    type=int,
-    # default=100,
-    help="The number of samples to discard at the start of each MCMC chain. This "
-         "will usually need to be on the order of a few hundred. If your chains "
-         "are taking too long to mix, try narrowing the bounds on the "
-         "hyperparameters and/or increasing --sampler-a. Default is 100."
-)
-parser.add_argument(
-    '--keep',
-    type=int,
-    # default=200,
-    help="The number of MCMC samples to keep when fitting the profiles. This "
-         "lets you get a full picture of the parameter space but only fit on the "
-         "number of profiles needed. Default is 200."
-)
-parser.add_argument(
-    '--sampler-a',
-    type=float,
-    # default=2.0,
-    help="The width of the sampler proposal distribution. If you observe "
-         "multiple modes with no mixing, try doubling this. This should always "
-         "be greater than unity. Default is 2.0."
-)
-parser.add_argument(
-    '--full-monte-carlo',
-    action='store_true',
-    help="Set this flag to compute these mean samples using a full Monte Carlo "
-         "simulation instead of error propagation."
-)
-parser.add_argument(
-    '--monte-carlo-samples',
-    type=int,
-    # default=500,
-    help="The number of Monte Carlo samples to use when --full-monte-carlo is "
-         "set and MAP estimation is used. Default is 500."
-)
-parser.add_argument(
-    '--reject-negative',
-    action='store_true',
-    help="Set this flag to reject any Monte Carlo samples that go negative "
-         "during the full Monte Carlo simulation. Only has an effect if "
-         "--full-monte-carlo is set."
-)
-parser.add_argument(
-    '--reject-non-monotonic',
-    action='store_true',
-    help="Set this flag to reject any Monte Carlo samples that are not monotonic "
-         "when performing the full Monte Carlo simulation. Only has an effect if "
-         "--full-monte-carlo is set."
-)
-parser.add_argument(
-    '--no-a-over-L',
-    action='store_true',
-    help="Set this flag to turn off the computation of a/L, which can save some "
-         "time if you don't need gradients/scale lengths."
-)
-parser.add_argument(
-    '--compute-vol-avg',
-    action='store_true',
-    help="Set this flag to compute the volume average of the profile."
-)
-parser.add_argument(
-    '--compute-peaking',
-    action='store_true',
-    help="Set this flag to compute the peaking figure of merit of the profile."
-)
-parser.add_argument(
-    '--compute-TCI',
-    action='store_true',
-    help="Set this flag to compute the integrals along the TCI chords. This will "
-         "only work if the TCI data are loaded."
-)
-parser.add_argument(
-    '-i', '--input-filename',
-    help="Filename/path to a CSV or NetCDF file containing the profile data to "
-         "be fit. Note that if you wish to make use of the core/edge value, "
-         "slope constraints you must provide t-min and t-max bracketing the "
-         "times used so that the program can find the locations of the magnetic "
-         "axis and GH limiter in the relevant coordinates. (Though it will "
-         "always be able to find the magnetic axis if you use a normalized "
-         "coordinate.) If the extension of the file is .csv it will be treated "
-         "as a comma-separated values file, all other extensions will be treated "
-         "as NetCDF files. If using a CSV file, the first row should be a "
-         "comma-separated list of the field names, as defined with "
-         "--abscissa-name and --ordinate-name. These columns can be in any order "
-         "in the actual file."
-)
-parser.add_argument(
-    '-o', '--output-filename',
-    help="Filename/path to write a NetCDF or CSV file to containing the results "
-         "of the fit. If not specified, you will be prompted for a filename upon "
-         "completing the fit."
-)
-parser.add_argument(
-    '-x', '--abscissa-name',
-    nargs='+',
-    help="Name(s) of the variable(s) in the input/output NetCDF/CSV files that "
-         "contain the values of the abscissa (independent variable(s)). The "
-         "uncertainty in the abscissa must then be in err_ABSCISSA_NAME, if "
-         "present. Note that uncertainties in the abscissa are NOT used in the "
-         "profile fit at present, but will be shown on the plot. If you do not "
-         "provide this when using a CSV file, the names will automatically be "
-         "inferred by looking at the order of the header of the CSV file. This "
-         "argument is required when using a NetCDF file. You must always put "
-         "your time variable first for this to work properly."
-)
-parser.add_argument(
-    '-y', '--ordinate-name',
-    help="Name of the variable in the input/output NetCDF/CSV files that "
-         "contains the values of the ordinate (dependent variable). The "
-         "uncertainty in the ordinate must then be in err_ORDINATE_NAME. If you "
-         "do not provide this when using a CSV file, the names will "
-         "automatically be inferred by looking at the order of the header of the "
-         "CSV file. This argument is required when using a NetCDF file."
-)
-parser.add_argument(
-    '--metadata-lines',
-    type=int,
-    help="Number of lines of metadata at the start of your CSV file to read. You "
-         "can include the shot, times and coordinate in the CSV file itself in "
-         "this manner. See the documentation on "
-         "profiletools.CMod.read_plasma_csv for more details. If you leave this "
-         "out, the program will check to see if the first line of your file is "
-         "of the form 'metadata LINES', where LINES is the number of lines of "
-         "metadata present."
-)
-parser.add_argument(
-    '--no-save-state',
-    action='store_true',
-    help="By default, pickle and NetCDF files will contain a representation of "
-         "the internal state of the program which can be reloaded at a later "
-         "time. You can set this flag to turn this feature off to make smaller "
-         "files. Note that there is no way to control this through the GUI."
-)
-parser.add_argument(
-    '--cov-in-save-state',
-    action='store_true',
-    help="By default, the state information saved (either into a fit result or "
-         "as a standalone file) will not contain the very large covariance "
-         "matrix. If you wish to have access to this information, pass this flag. "
-         "Note that there is no way to control this through the GUI."
-)
-parser.add_argument(
-    '--sampler-in-save-state',
-    action='store_true',
-    help="By default, the state information saved (either into a fit result or "
-         "as a standalone file) will not contain the very large MCMC sampler "
-         "instance. If you wish to have access to this information, pass this "
-         "flag. Note that there is no way to control this through the GUI."
-)
-parser.add_argument(
-    '--full-auto',
-    action='store_true',
-    help="Set this flag to disable all prompting for missing/optional arguments "
-         "and run fully automatically. The program will exit with status 1 if "
-         "any required parameters are missing. The program will still stop to "
-         "allow the user to assess the quality of the fit."
-)
-parser.add_argument(
-    '--no-interaction',
-    action='store_true',
-    help="Set this flag to not let the user interact with the GUI. The fit will "
-         "be automatically run and saved, along with a picture of the plot, to "
-         "the output file specified."
-)
-parser.add_argument(
-    '--no-mainloop',
-    action='store_true',
-    help="Set this flag to disable starting of the Tkinter main loop. This is "
-         "useful for debugging."
-)
-parser.add_argument(
-    '--x-lim',
-    type=float,
-    nargs=2,
-    help="The upper and lower bounds for the horizontal plot axis. If not "
-         "provided, these will be set from the data."
-)
-parser.add_argument(
-    '--y-lim',
-    type=float,
-    nargs=2,
-    help="The upper and lower bounds for the vertical plot axis. If not provided, "
-         "these will be set from the data."
-)
-parser.add_argument(
-    '--dy-lim',
-    type=float,
-    nargs=2,
-    help="The upper and lower bounds for the gradient plot. If not provided, "
-         "these will be set from the data."
-)
-parser.add_argument(
-    '--aLy-lim',
-    type=float,
-    nargs=2,
-    help="The upper and lower bounds for the inverse gradient scale length plot. "
-         "If not provided, these will be set from the data."
-)
-parser.add_argument(
-    '--load',
-    help="Name of a file to load the settings from. Any command line flags used "
-         "will override the settings in the file. This can either be a .gpfit "
-         "file with only settings or a Pickle or NetCDF file that was produced "
-         "with the 'save fit' button in gpfit."
-)
+    formatter_class=CustomFormatter
+)
+parser.add_argument('--signal',
+                    choices=list(SYSTEM_OPTIONS.keys()),
+                    help="Which signal to fit when pulling data from the tree.")
+parser.add_argument('--shot',
+                    type=int,
+                    help="Shot number to use. Required when pulling data from "
+                         "the tree. When pulling data from a file, this is "
+                         "needed to specify constraints at the magnetic axis and "
+                         "limiter.")
+parser.add_argument('--EFIT-tree',
+                    help="EFIT tree to use. Default is ANALYSIS. Otherwise, give "
+                         "a name like 'EFIT20'.")
+parser.add_argument('--t-min',
+                    type=float,
+                    help="Starting time of period to average over. If you are "
+                         "reading data from a file, you can set this flag to "
+                         "tell the program what time window to average over "
+                         "when finding the location of the limiter/magnetic axis "
+                         "when applying constraints.")
+parser.add_argument('--t-max',
+                    type=float,
+                    help="Ending time of period to average over. If you are "
+                         "reading data from a file, you can set this flag to "
+                         "tell the program what time window to average over when "
+                         "finding the location of the limiter/magnetic axis "
+                         "when applying constraints.")
+parser.add_argument('-t', '--t-points',
+                    type=float,
+                    metavar='T_POINT',
+                    nargs='+',
+                    help="Individual time values to use. The nearest time to "
+                         "each will be selected for each channel. You can use "
+                         "this, for instance, to specify the times you have "
+                         "determined are at a particular sawtooth/ELM phase. You "
+                         "must either specify --t-min and --t-max, or -t.")
+parser.add_argument('--npts',
+                    type=int,
+                    default=400,
+                    help="Number of evenly-spaced points to evaluate the fit at.")
+parser.add_argument('--x-min',
+                    type=float,
+                    default=0,
+                    help="Starting point for the evenly-spaced points to evaluate "
+                         "the fit at.")
+parser.add_argument('--x-max',
+                    type=float,
+                    default=1.2,
+                    help="Ending point for the evenly-spaced points to evaluate "
+                         "the fit at.")
+parser.add_argument('--x-pts',
+                    type=float,
+                    metavar='X_PT',
+                    nargs='+',
+                    help="Discrete points to evaluate the fit at. If present, "
+                         "this overrides the effect of npts, x-min and x-max.")
+parser.add_argument('--system',
+                    nargs='+',
+                    choices=valid_systems,
+                    help="Which system(s) to take data from. If not provided, "
+                         "all applicable systems will be used. The 'TS' option "
+                         "is a shortcut to include both the core (CTS) and edge "
+                         "(ETS) Thomson systems. Note that working with TCI data "
+                         "is VERY slow. Also note that the statistics of "
+                         "including the SOL reflectometer are questionable, so "
+                         "you uncertainties should be taken with a grain of salt "
+                         "when using those data.")
+parser.add_argument('--kernel',
+                    choices=list(HYPERPARAMETERS.keys()),
+                    # default='gibbstanh',
+                    help="Which covariance kernel to use. This dictates the "
+                         "properties of the fit. "
+                         "* gibbstanh is the Gibbs kernel with tanh warping of "
+                         "the length scale. This kernel allows the entire "
+                         "profile to be fit at once, and should be used if you "
+                         "have edge data. "
+                         "* gibbsdoubletanh is an experimental Gibbs kernel "
+                         "whose warping function is the sum of two hyperbolic "
+                         "tangents. This may be useful for whole profiles with "
+                         "complicated shapes. "
+                         "* SE is the squared exponential kernel, which is good "
+                         "for core data. "
+                         "* SEsym1d is an experimental SE kernel with symmetry "
+                         "constraint imposed by construction. This is primarily "
+                         "useful for core data. "
+                         "* SEbeta is an experimental SE kernel whose arguments "
+                         "are warped using the regularized incomplete beta "
+                         "function. This is good when you have edge data. "
+                         "* RQ is the rational quadratic kernel, good for "
+                         "core data. "
+                         "* matern is the Matern kernel, which is also "
+                         "potentially useful for core data. Note that the matern "
+                         "kernel is very SLOW to evaluate, particularly if you "
+                         "need gradients. "
+                         "* matern52 is a task-specific implementation of the "
+                         "Matern kernel with the order fixed at nu=5/2. This is "
+                         "MUCH faster than the basic matern. This is mostly "
+                         "suitable for core data. "
+                         "* matern52beta is the same as matern52, but with the "
+                         "same warping as SEbeta applied. This is potentially "
+                         "suitable for fitting entire profiles. "
+                         "You will typically want to set --no-edge-constraint "
+                         "and/or --core-only if you specify any kernel other "
+                         "gibbstanh and gibbsdoubletanh. See also --core-only. "
+                         "The default is gibbstanh, or SE if --core-only is set.")
+parser.add_argument('--coordinate',
+                    choices=COORDINATE_OPTIONS,
+                    default='',
+                    help="Which coordinate to fit against. Defaults to r/a "
+                         "when pulling data from the tree. Used to determine how "
+                         "to apply core/edge constraints when pulling data from "
+                         "a file.")
+parser.add_argument('--no-core-constraint',
+                    action='store_true',
+                    help="Set this flag to disable the slope=0 constraint at the "
+                         "magnetic axis.")
+parser.add_argument('--no-edge-constraint',
+                    action='store_true',
+                    help="Set this flag to disable the slope, value=0 constraint "
+                         "at/outside the GH limiter.")
+parser.add_argument('--core-constraint-location',
+                    type=float,
+                    metavar='LOC',
+                    nargs='+',
+                    help="Location to impose slope=0 constraint at. Typically "
+                         "this is the magnetic axis. If you specify a shot "
+                         "number and times then this will be found automatically, "
+                         "but you can override it with this flag. Note that you "
+                         "can specify multiple locations if you want to have "
+                         "multiple points where the slope goes to exactly zero.")
+parser.add_argument('--edge-constraint-locations',
+                    type=float,
+                    metavar='LOC',
+                    nargs='+',
+                    help="Location to impose slope~0, value~0 constraints at. "
+                         "Typically this is at the location of the GH limiter. "
+                         "If you specify a shot number and times then this will "
+                         "be found automatically, but you can override it with "
+                         "this flag. It helps to specify a couple of points "
+                         "outside the GH limiter, as well.")
+parser.add_argument('--core-only',
+                    action='store_true',
+                    help="Set this flag to only fit the data inside the LCFS. "
+                         "This will switch to using a squared exponential kernel, "
+                         "and will disable the edge value, slope constraints.")
+parser.add_argument('--robust',
+                    action='store_true',
+                    help="Set this flag to use robust estimators (median, IQR) "
+                         "when performing time-averages. Note that using robust "
+                         "weighted estimators will not work for small numbers of "
+                         "data points.")
+parser.add_argument('--uncertainty-method',
+                    choices=error_method_cl,
+                    default='sample',
+                    help="Method by which the uncertainty should be propagated "
+                         "when time-averaging. "
+                         "* sample will take the sample standard deviation, and "
+                         "is usually appropriate for cases where you have many "
+                         "points to average over and the data are not completely "
+                         "stationary in time. "
+                         "* RMS uses the root-mean-square standard deviation, "
+                         "and is appropriate for small sample sizes. Note that "
+                         "this is questionable when applied to diagnostics "
+                         "other than TS for which the individual error bars are "
+                         "estimated as some fixed percent of the value. "
+                         "* total uses the law of total variance which is the "
+                         "square root of the sum of the mean square uncertainty "
+                         "and sample variance. This is appropriate when the "
+                         "given points already represent actual sample "
+                         "means/variances. "
+                         "* of_mean uses the uncertainty in the mean using the "
+                         "individual error bars on the points, and is only "
+                         "appropriate if the data are steady in time. It is very "
+                         "questionable to use this with robust estimators."
+                         "* of_mean_sample uses the uncertainty in the mean "
+                         "using the sample standard deviation, and is only "
+                         "appropriate if the data are steady in time. It is very "
+                         "questionable to use this with robust estimators.")
+parser.add_argument('--unweighted',
+                    action='store_true',
+                    help="Set this flag to use unweighted estimators when "
+                         "averaging the data. Otherwise the weights used are "
+                         "1/sigma_i^2. Note that using robust weighted estimators "
+                         "will not work for small numbers of data points. Note "
+                         "that this is questionable when applied to diagnostics "
+                         "other than TS for which the individual error bars are "
+                         "estimated as some fixed percent of the value.")
+parser.add_argument('--all-points', '--no-average',
+                    action='store_true',
+                    help="Set this flag to keep all points from the time window "
+                         "selected instead of performing a time average. This "
+                         "will make the fit take longer and is statistically "
+                         "questionable, but may be useful in some cases.")
+parser.add_argument('--change-threshold',
+                    type=float,
+                    help="If provided, any points whose differences with respect "
+                         "to either of their neighbors are more than this many "
+                         "times their own error bar will be rejected. This is "
+                         "useful for getting rid of bad channels. A value of 9 "
+                         "is often useful. Note that this does not take into "
+                         "account the uncertainties on the neighbors -- it is "
+                         "primarily designed to catch bad channels that don't "
+                         "get caught by the method employed by "
+                         "--outlier-threshold. This can lead to good data "
+                         "getting thrown out if the threshold is too low.")
+parser.add_argument('--outlier-threshold',
+                    type=float,
+                    help="If provided, any points whose values are more than this "
+                         "many times their own error bar outside of the fit will "
+                         "be rejected. A value of 3 is often useful. Note that "
+                         "this can get thrown off by extremely bad channels that "
+                         "drag the whole fit off.")
+parser.add_argument('--remove-points',
+                    type=int,
+                    nargs='+',
+                    help="Indices of points to remove. These are the indices in "
+                         "the combined Profile object. These will usually be the "
+                         "same from shot-to-shot, but may change if entire "
+                         "channels are removed during data loading. Use "
+                         "--plot-idxs to see the indices to use.")
+parser.add_argument('--plot-idxs',
+                    action='store_true',
+                    help="Set this flag to overplot the indices of the points. "
+                         "These are the indices to use with --remove-points.")
+parser.add_argument('--random-starts',
+                    type=int,
+                    help="The number of random starts to use when trying to find "
+                         "the MAP estimate for the hyperparameters. If you are "
+                         "getting bad fits, try increasing this. If not "
+                         "specified, this is set to the number of processors "
+                         "available on your machine or 20, whichever is smaller.")
+parser.add_argument('--upper-factor',
+                    type=float,
+                    default=5,
+                    help="Factor by which the range of the data is multiplied "
+                         "to generate the upper bound on the hyperparameters. If "
+                         "you are getting bad fits, try adjusting this.")
+parser.add_argument('--lower-factor',
+                    type=float,
+                    default=5,
+                    help="Factor by which the range of the data is divided to "
+                         "generate the lower bound on the hyperparameters. If "
+                         "you are getting bad fits, try adjusting this.")
+parser.add_argument('--bounds',
+                    type=float,
+                    nargs='+',
+                    help="Bounds to use for each of the hyperparameters. "
+                         "Specified as pairs of lower, upper bounds. If present, "
+                         "there should be two such pairs for the squared "
+                         "exponential kernel and five such pairs for the Gibbs "
+                         "kernel with tanh length scale warping. If not specified, "
+                         "somewhat intelligent guesses are made based on the data "
+                         "itself. If you are getting bad fits, try tweaking these. "
+                         "Note that this overrides --upper-factor and --lower-factor "
+                         "if present.")
+parser.add_argument('--use-MCMC',
+                    action='store_true',
+                    help="Set this flag to use MCMC integration over the "
+                         "hyperparameters instead of MAP estimation. This is "
+                         "the most rigorous way of capturing all uncertainty, "
+                         "and should always be used if you are interested in "
+                         "gradients and/or the details of the edge. Note that "
+                         "this is very computationally expensive, but benefits "
+                         "strongly from having many cores to run on.")
+parser.add_argument('--walkers',
+                    type=int,
+                    default=200,
+                    help="The number of walkers to use to explore the parameter "
+                         "space. This number should be high, on the order of "
+                         "a few hundred. If you are getting poor mixing of the "
+                         "MCMC integration, try increasing this by a hundred at "
+                         "a time.")
+parser.add_argument('--MCMC-samp',
+                    type=int,
+                    default=200,
+                    help="The number of samples to take with each walker. 200 is "
+                         "a good number to get a look at the sample space and "
+                         "dial in the bounds.")
+parser.add_argument('--burn',
+                    type=int,
+                    default=100,
+                    help="The number of samples to discard at the start of each "
+                         "MCMC chain. This will usually need to be on the order "
+                         "of a few hundred. If your chains are taking too long "
+                         "to mix, try narrowing the bounds on the hyperparameters.")
+parser.add_argument('--keep',
+                    type=int,
+                    default=200,
+                    help="The number of MCMC samples to keep when fitting the "
+                         "profiles. This lets you get a full picture of the "
+                         "parameter space but only fit on the number of profiles "
+                         "needed.")
+parser.add_argument('--full-monte-carlo',
+                    action='store_true',
+                    help="Set this flag to compute these mean samples using a "
+                         "full Monte Carlo simulation instead of error propagation.")
+parser.add_argument('--monte-carlo-samples',
+                    type=int,
+                    default=500,
+                    help="The number of Monte Carlo samples to use when "
+                         "--full-monte-carlo is set and MAP estimation is used.")
+parser.add_argument('--reject-negative',
+                    action='store_true',
+                    help="Set this flag to reject any Monte Carlo samples that go "
+                         "negative during the full Monte Carlo simulation. Only "
+                         "has an effect if --full-monte-carlo is set.")
+parser.add_argument('--reject-non-monotonic',
+                    action='store_true',
+                    help="Set this flag to reject any Monte Carlo samples that "
+                         "are not monotonic when performing the full Monte Carlo "
+                         "simulation. Only has an effect if --full-monte-carlo "
+                         "is set.")
+parser.add_argument('--no-a-over-L',
+                    action='store_true',
+                    help="Set this flag to turn off the computation of a/L, "
+                         "which can save some time if you don't need gradients/"
+                         "scale lengths.")
+parser.add_argument('--compute-vol-avg',
+                    action='store_true',
+                    help="Set this flag to compute the volume average of the "
+                         "profile.")
+parser.add_argument('--compute-peaking',
+                    action='store_true',
+                    help="Set this flag to compute the peaking figure of merit "
+                         "of the profile.")
+parser.add_argument('--compute-TCI',
+                    action='store_true',
+                    help="Set this flag to compute the integrals along the TCI "
+                         "chords. This will only work if the TCI data are loaded.")
+parser.add_argument('-i', '--input-filename',
+                    help="Filename/path to a CSV or NetCDF file containing the "
+                         "profile data to be fit. Note that if you wish to make "
+                         "use of the core/edge value, slope constraints you must "
+                         "provide t-min and t-max bracketing the times used so "
+                         "that the program can find the locations of the magnetic "
+                         "axis and GH limiter in the relevant coordinates. "
+                         "(Though it will always be able to find the magnetic "
+                         "axis if you use a normalized coordinate.) If the "
+                         "extension of the file is .csv it will be treated as a "
+                         "comma-separated values file, all other extensions will "
+                         "be treated as NetCDF files. If using a CSV file, the "
+                         "first row should be a comma-separated list of the field "
+                         "names, as defined with --abscissa-name and "
+                         "--ordinate-name. These columns can be in any order in "
+                         "the actual file.")
+parser.add_argument('-o', '--output-filename',
+                    help="Filename/path to write a NetCDF or CSV file to"
+                         "containing the results of the fit. If not specified, "
+                         "you will be prompted for a filename upon completing "
+                         "the fit.")
+parser.add_argument('-x', '--abscissa-name',
+                    nargs='+',
+                    help="Name(s) of the variable(s) in the input/output NetCDF/"
+                         "CSV files that contain the values of the abscissa "
+                         "(independent variable(s)). The uncertainty in the "
+                         "abscissa must then be in err_ABSCISSA_NAME, if "
+                         "present. Note that uncertainties in the abscissa are "
+                         "NOT used in the profile fit at present, but will be "
+                         "shown on the plot. If you do not provide this when "
+                         "using a CSV file, the names will automatically be "
+                         "inferred by looking at the order of the header of the "
+                         "CSV file. This argument is required when using a "
+                         "NetCDF file. You must always put your time variable "
+                         "first for this to work properly.")
+parser.add_argument('-y', '--ordinate-name',
+                    help="Name of the variable in the input/output NetCDF/CSV "
+                         "files that contains the values of the ordinate "
+                         "(dependent variable). The uncertainty in the ordinate "
+                         "must then be in err_ORDINATE_NAME. If you do not "
+                         "provide this when using a CSV file, the names will "
+                         "automatically be inferred by looking at the order of "
+                         "the header of the CSV file. This argument is required "
+                         "when using a NetCDF file.")
+parser.add_argument('--metadata-lines',
+                    type=int,
+                    help="Number of lines of metadata at the start of your CSV "
+                         "file to read. You can include the shot, times and "
+                         "coordinate in the CSV file itself in this manner. See "
+                         "the documentation on profiletools.CMod.read_plasma_csv "
+                         "for more details. If you leave this out, the program "
+                         "will check to see if the first line of your file is of "
+                         "the form 'metadata LINES', where LINES is the number of "
+                         "lines of metadata present.")
+parser.add_argument('--full-auto',
+                    action='store_true',
+                    help="Set this flag to disable all prompting for missing/"
+                         "optional arguments and run fully automatically. The "
+                         "program will exit with status 1 if any required "
+                         "parameters are missing. The program will still stop to "
+                         "allow the user to assess the quality of the fit.")
+parser.add_argument('--no-interaction',
+                    action='store_true',
+                    help="Set this flag to not let the user interact with the "
+                         "GUI. The fit will be automatically run and saved, "
+                         "along with a picture of the plot, to the output file "
+                         "specified.")
+parser.add_argument('--no-mainloop',
+                    action='store_true',
+                    help="Set this flag to disable starting of the Tkinter "
+                         "main loop. This is useful for debugging.")
+parser.add_argument('--x-lim',
+                    type=float,
+                    nargs=2,
+                    help="The upper and lower bounds for the horizontal plot "
+                         "axis. If not provided, these will be set from the data.")
+parser.add_argument('--y-lim',
+                    type=float,
+                    nargs=2,
+                    help="The upper and lower bounds for the vertical plot axis. "
+                         "If not provided, these will be set from the data.")
 
-if __name__ == "__main__":
-    args = parser.parse_args()
+args = parser.parse_args()
 
 ### ======================== START OF MAIN PROGRAM ======================== ###
 
@@ -899,10 +660,9 @@ hostname = socket.gethostname().lower()
 if ('juggernaut' not in hostname and
     'sydney' not in hostname and
     'cosmonaut' not in hostname):
-    sys.path.insert(0, "/home/markchil/codes/gptools")
-    sys.path.insert(0, "/home/markchil/codes/profiletools")
-    sys.path.insert(0, "/home/markchil/codes/TRIPPy")
-    sys.path.insert(0, "/home/markchil/codes/efit/development/EqTools")
+    sys.path.append("/home/markchil/codes/gptools")
+    sys.path.append("/home/markchil/codes/profiletools")
+    sys.path.append("/home/markchil/codes/efit/development/EqTools")
 
 import matplotlib
 matplotlib.use("TkAgg")
@@ -948,20 +708,6 @@ FRAME_PARAMS = {'relief': tk.RAISED, 'borderwidth': 2}
 # non-numeric characters, where the decimal point and minus sign are considered
 # numeric.
 LIST_REGEX = r'([-0-9.]+)[^-0-9.]*'
-
-# Regex used to split lists which include ranges up. This will let the list be
-# delimted by any non-numeric characters, where the decimal point and colon
-# are considered numeric.
-RANGE_LIST_REGEX = r'(-?[0-9]+[:-]*-?[0-9]+|-?[0-9]+)[^-0-9:]*'
-
-# Define the JointPrior objects corresponding to each hyperprior:
-HYPERPRIOR_MAP = {
-    'uniform': gptools.UniformJointPrior,
-    'gamma': gptools.GammaJointPrior,
-    'normal': gptools.NormalJointPrior,
-    'log-normal': gptools.LogNormalJointPrior,
-    'alt-gamma': gptools.GammaJointPriorAlt
-}
 
 class TreeFileFrame(tk.Frame):
     """Frame to hold the buttons to choose between using the tree or a file,
@@ -1135,21 +881,13 @@ class OptionBox(tk.Frame):
         self.button = tk.Checkbutton(
             self,
             text=self.system,
-            variable=self.state_var,
-            command=self.invoke_TCI if self.system == 'TCI' else None
+            variable=self.state_var
         )
         self.button.grid(row=0, column=0)
         
         # Set default value:
         if self.system not in DEFAULT_EXCLUDE:
             self.button.select()
-        if self.system == 'TCI':
-            self.invoke_TCI()
-    
-    def invoke_TCI(self):
-        """Set the state of the TCI settings accordingly.
-        """
-        self.master.master.set_TCI_state(self.state_var.get())
 
 class SystemFrame(tk.Frame):
     """Frame to handle selection of systems to include.
@@ -1175,40 +913,8 @@ class SystemFrame(tk.Frame):
             for k in range(0, len(self.buttons)):
                 self.buttons[k].grid(row=0, column=k)
 
-class TCIFrame(tk.Frame):
-    """Frame to handle selection of the settings for the TCI data.
-    """
-    def __init__(self, *args, **kwargs):
-        # Need to use old, hackish way since tkinter uses old-style classes:
-        tk.Frame.__init__(self, *args, **kwargs)
-        
-        self.TCI_points_label = tk.Label(self, text="TCI quadrature points:")
-        self.TCI_points_label.grid(row=0, column=0, sticky='E')
-        
-        self.TCI_points_box = tk.Entry(self, width=3)
-        self.TCI_points_box.grid(row=0, column=1, sticky='EW')
-        self.TCI_points_box.insert(0, '100')
-        
-        self.TCI_thin_label = tk.Label(self, text='thin:')
-        self.TCI_thin_label.grid(row=0, column=2, sticky='E')
-        
-        self.TCI_thin_box = tk.Entry(self, width=3)
-        self.TCI_thin_box.grid(row=0, column=3, sticky='EW')
-        self.TCI_thin_box.insert(0, '1')
-        
-        self.TCI_ds_label = tk.Label(self, text='ds:')
-        self.TCI_ds_label.grid(row=0, column=4, sticky='E')
-        
-        self.TCI_ds_box = tk.Entry(self, width=3)
-        self.TCI_ds_box.grid(row=0, column=5, sticky='EW')
-        self.TCI_ds_box.insert(0, '1e-3')
-        
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_columnconfigure(3, weight=1)
-        self.grid_columnconfigure(5, weight=1)
-
 class EFITFrame(tk.Frame):
-    """Frame to handle selection of the EFIT tree to use.
+    """Frame to handle selection of the EFIT tree to use:
     """
     def __init__(self, *args, **kwargs):
         # Need to use old, hackish way since tkinter uses old-style classes:
@@ -1250,42 +956,19 @@ class DataSourceFrame(tk.Frame):
         self.signal_coordinate_frame = SignalCoordinateFrame(self)
         self.signal_coordinate_frame.grid(row=4, sticky='EW')
         
-        # Create frame to hold TCI settings. This needs to be done BEFORE the
-        # systems frame so we can set the state of the TCI stuff properly:
-        self.TCI_frame = TCIFrame(self)
-        self.TCI_frame.grid(row=6, sticky='EW')
-        
         # Create frame to hold signal selection check buttons:
         self.system_frame = SystemFrame(self)
         self.system_frame.grid(row=5, sticky='W')
         
         # Create frame to hold EFIT tree selection:
         self.EFIT_frame = EFITFrame(self)
-        self.EFIT_frame.grid(row=7, sticky='EW')
+        self.EFIT_frame.grid(row=6, sticky='EW')
         
         # Allow columns to grow:
         self.grid_columnconfigure(0, weight=1)
         
         # Set default conditions:
         self.tree_file_frame.tree_button.invoke()
-    
-    def set_TCI_state(self, state):
-        """Set the TCI boxes to the indicated state.
-        """
-        if state:
-            self.TCI_frame.TCI_points_label.config(state=tk.NORMAL)
-            self.TCI_frame.TCI_points_box.config(state=tk.NORMAL)
-            self.TCI_frame.TCI_thin_label.config(state=tk.NORMAL)
-            self.TCI_frame.TCI_thin_box.config(state=tk.NORMAL)
-            self.TCI_frame.TCI_ds_label.config(state=tk.NORMAL)
-            self.TCI_frame.TCI_ds_box.config(state=tk.NORMAL)
-        else:
-            self.TCI_frame.TCI_points_label.config(state=tk.DISABLED)
-            self.TCI_frame.TCI_points_box.config(state=tk.DISABLED)
-            self.TCI_frame.TCI_thin_label.config(state=tk.DISABLED)
-            self.TCI_frame.TCI_thin_box.config(state=tk.DISABLED)
-            self.TCI_frame.TCI_ds_label.config(state=tk.DISABLED)
-            self.TCI_frame.TCI_ds_box.config(state=tk.DISABLED)
     
     def update_source(self):
         """Update changes between tree and file mode.
@@ -1322,7 +1005,6 @@ class DataSourceFrame(tk.Frame):
     def update_signal(self, signal):
         """Updates the available systems when the `signal` changes.
         """
-        self.set_TCI_state(False)
         self.system_frame.update_systems(signal)
 
 class TimeWindowFrame(tk.Frame):
@@ -1362,7 +1044,7 @@ class TimeWindowFrame(tk.Frame):
         self.t_max_units.grid(row=0, column=4)
         
         # Create labels and fields to hold time points:
-        self.times_box = TimePointsFrame(self)
+        self.times_box = tk.Entry(self)
         self.times_box.grid(row=1, column=1, columnspan=4, sticky='EW')
         
         # Allow elements to resize:
@@ -1373,39 +1055,17 @@ class TimeWindowFrame(tk.Frame):
         """Update whether the window or points boxes are enabled.
         """
         if self.method_state.get() == self.WINDOW_MODE:
-            self.times_box.set_state(tk.DISABLED)
+            self.times_box.config(state=tk.DISABLED)
             self.t_min_box.config(state=tk.NORMAL)
             self.t_min_units.config(state=tk.NORMAL)
             self.t_max_box.config(state=tk.NORMAL)
             self.t_max_units.config(state=tk.NORMAL)
         else:
-            self.times_box.set_state(tk.NORMAL)
+            self.times_box.config(state=tk.NORMAL)
             self.t_min_box.config(state=tk.DISABLED)
             self.t_min_units.config(state=tk.DISABLED)
             self.t_max_box.config(state=tk.DISABLED)
             self.t_max_units.config(state=tk.DISABLED)
-
-class TimePointsFrame(tk.Frame):
-    def __init__(self, *args, **kwargs):
-        tk.Frame.__init__(self, *args, **kwargs)
-        
-        self.times_box = tk.Entry(self)
-        self.times_box.grid(row=0, column=0, sticky='EW')
-        self.times_tol_label = tk.Label(self, text='s tol:')
-        self.times_tol_label.grid(row=0, column=1)
-        self.times_tol_box = tk.Entry(self, width=3)
-        self.times_tol_box.grid(row=0, column=2, sticky='EW')
-        self.times_tol_units_label = tk.Label(self, text='s')
-        self.times_tol_units_label.grid(row=0, column=3)
-        
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(2, weight=1)
-    
-    def set_state(self, state):
-        self.times_box.config(state=state)
-        self.times_tol_label.config(state=state)
-        self.times_tol_box.config(state=state)
-        self.times_tol_units_label.config(state=state)
 
 class MethodFrame(tk.Frame):
     """Frame to select averaging/uncertainty methods.
@@ -1455,51 +1115,6 @@ class MethodFrame(tk.Frame):
             self.error_method_label.config(state=tk.NORMAL)
             self.weighted_button.config(state=tk.NORMAL)
 
-class UncertaintyAdjustFrame(tk.Frame):
-    """Frame to hold controls to adjust uncertainties.
-    """
-    def __init__(self, *args, **kwargs):
-        tk.Frame.__init__(self, *args, **kwargs)
-        
-        self.fudge_state = tk.IntVar(self)
-        self.fudge_button = tk.Checkbutton(
-            self,
-            text="adjust uncertainty",
-            command=self.set_state,
-            variable=self.fudge_state
-        )
-        self.fudge_button.grid(row=0, column=0)
-        
-        self.fudge_method_var = tk.StringVar(self)
-        self.fudge_method_var.set(FUDGE_METHOD_OPTIONS[0])
-        self.fudge_method_menu = tk.OptionMenu(self, self.fudge_method_var, *FUDGE_METHOD_OPTIONS)
-        self.fudge_method_menu.grid(row=0, column=1)
-        
-        self.fudge_value_label = tk.Label(self, text='value:')
-        self.fudge_value_label.grid(row=0, column=2)
-        
-        self.fudge_value_box = tk.Entry(self, width=3)
-        self.fudge_value_box.grid(row=0, column=3)
-        
-        self.fudge_type_var = tk.StringVar(self)
-        self.fudge_type_var.set(FUDGE_TYPE_OPTIONS[0])
-        self.fudge_type_menu = tk.OptionMenu(self, self.fudge_type_var, *FUDGE_TYPE_OPTIONS)
-        self.fudge_type_menu.grid(row=0, column=4)
-        
-        self.set_state()
-    
-    def set_state(self):
-        if self.fudge_state.get():
-            self.fudge_method_menu.config(state=tk.NORMAL)
-            self.fudge_value_label.config(state=tk.NORMAL)
-            self.fudge_value_box.config(state=tk.NORMAL)
-            self.fudge_type_menu.config(state=tk.NORMAL)
-        else:
-            self.fudge_method_menu.config(state=tk.DISABLED)
-            self.fudge_value_label.config(state=tk.DISABLED)
-            self.fudge_value_box.config(state=tk.DISABLED)
-            self.fudge_type_menu.config(state=tk.DISABLED)
-
 class AveragingFrame(tk.Frame):
     """Frame to hold the components specifying how averaging is performed.
     """
@@ -1519,10 +1134,6 @@ class AveragingFrame(tk.Frame):
         self.method_frame = MethodFrame(self)
         self.method_frame.grid(row=2, sticky='W')
         
-        # Create frame to hold fudge selection:
-        self.fudge_frame = UncertaintyAdjustFrame(self)
-        self.fudge_frame.grid(row=3, sticky='EW')
-        
         # Allow elements to resize:
         self.grid_columnconfigure(0, weight=1)
         
@@ -1537,11 +1148,7 @@ class OutlierFrame(tk.Frame):
         tk.Frame.__init__(self, *args, **kwargs)
         
         # Create main label for frame:
-        self.frame_label = tk.Label(
-            self,
-            text="Outlier Rejection",
-            font=tkinter.font.Font(weight=tkinter.font.BOLD)
-        )
+        self.frame_label = tk.Label(self, text="Outlier Rejection", font=tkinter.font.Font(weight=tkinter.font.BOLD))
         self.frame_label.grid(row=0, sticky='W')
         
         # Create checkbuttons to select types:
@@ -1639,7 +1246,7 @@ class OutlierFrame(tk.Frame):
             self.idx_plotted = None
         if self.show_idx_state.get():
             # Only do anything if the data have been loaded.
-            if self.master.master.master.combined_p is not None and self.master.master.master.combined_p.X is not None:
+            if self.master.master.master.combined_p is not None:
                 self.idx_plotted = [
                     self.master.master.master.plot_frame.a_val.text(x, y, str(i))
                     for i, x, y in zip(
@@ -1697,104 +1304,29 @@ class KernelBoundsFrame(tk.Frame):
         
         self.hyperparameters = hyperparameters
         
-        self.hyperprior_frames = []
+        self.labels = []
+        self.lower_bounds = []
+        self.to_labels = []
+        self.upper_bounds = []
         
-        for k, hp in zip(list(range(0, len(self.hyperparameters))), self.hyperparameters):
-            self.hyperprior_frames.append(
-                HyperpriorFrame(
-                    hp,
-                    "%s, %s:" % (self.hyperparameters[hp], hp),
-                    self
+        for k, hp in zip(range(0, len(self.hyperparameters)), self.hyperparameters):
+            self.labels.append(
+                tk.Label(
+                    self,
+                    text="%s, %s:" % (self.hyperparameters[hp], hp,)
                 )
             )
-            self.hyperprior_frames[-1].grid(row=k, column=0, sticky='EW')
-        
-        self.grid_columnconfigure(0, weight=1)
-
-class HyperpriorFrame(tk.Frame):
-    """Frame to handle the selection of the hyperprior for a given hyperparameter.
-    
-    Parameters
-    ----------
-    name : str
-        The name of the hyperparameter this applies to.
-    """
-    def __init__(self, name, long_name, *args, **kwargs):
-        tk.Frame.__init__(self, *args, **kwargs)
-        
-        self.name = name
-        
-        self.row_label = tk.Label(self, text=long_name)
-        self.row_label.grid(row=0, column=0, sticky='E')
-        
-        self.hp_type_var = tk.StringVar(self)
-        self.hp_type_var.set(HYPERPRIOR_DEFAULTS[name][0])
-        self.hp_type = self.hp_type_var.get()
-        self.hp_type_menu = tk.OptionMenu(
-            self,
-            self.hp_type_var,
-            *list(HYPERPRIORS.keys()),
-            command=self.update_hp_type
-        )
-        self.hp_type_menu.grid(row=0, column=1, sticky='W')
-        
-        self.hyperhyperparameter_frame = HyperhyperparameterFrame(
-            HYPERPRIORS[self.hp_type],
-            HYPERPRIOR_DEFAULTS[name][1],
-            self
-        )
-        self.hyperhyperparameter_frame.grid(row=0, column=2, sticky='EW')
-        
-        self.grid_columnconfigure(2, weight=1)
-    
-    def update_hp_type(self, hp_type):
-        if hp_type != self.hp_type:
-            self.hyperhyperparameter_frame.destroy()
-            self.hyperhyperparameter_frame = HyperhyperparameterFrame(
-                HYPERPRIORS[hp_type],
-                HYPERPRIOR_DEFAULTS[self.name][1],
-                self
-            )
-            self.hyperhyperparameter_frame.grid(row=0, column=2, sticky='EW')
-            self.hp_type = hp_type
-    
-    def get_hyperprior(self):
-        try:
-            return HYPERPRIOR_MAP[self.hp_type](
-                [float(self.hyperhyperparameter_frame.boxes[0].get())],
-                [float(self.hyperhyperparameter_frame.boxes[1].get())]
-            )
-        except ValueError:
-            self.master.master.master.status_frame.add_line(
-                "Invalid hyperprior for %s!" % (self.name,)
-            )
-            return None
-        except KeyError:
-            raise ValueError("Unsupported hyperprior type!")
-
-class HyperhyperparameterFrame(tk.Frame):
-    """Frame to handle setting of the hyperhyperparameters of a given hyperprior.
-    
-    Parameters
-    ----------
-    names : list of str
-        The names of the hyperhyperparameters, in order.
-    """
-    def __init__(self, names, defaults, *args, **kwargs):
-        tk.Frame.__init__(self, *args, **kwargs)
-        
-        self.labels = []
-        self.boxes = []
-        
-        for k, name, d in zip(list(range(0, len(names))), names, defaults):
-            self.labels.append(tk.Label(self, text=name))
-            self.labels[-1].grid(row=0, column=2 * k, sticky='E')
+            self.lower_bounds.append(tk.Entry(self, width=6))
+            self.to_labels.append(tk.Label(self, text="to"))
+            self.upper_bounds.append(tk.Entry(self, width=6))
             
-            self.boxes.append(tk.Entry(self, width=3))
-            self.boxes[-1].insert(0, str(d))
-            self.boxes[-1].grid(row=0, column=2 * k + 1, sticky='EW')
-            
-            self.grid_columnconfigure(2 * k + 1, weight=1)
+            self.labels[k].grid(row=k, column=0, sticky='E')
+            self.lower_bounds[k].grid(row=k, column=1, sticky='EW')
+            self.to_labels[k].grid(row=k, column=2)
+            self.upper_bounds[k].grid(row=k, column=3, sticky='EW')
+        
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(3, weight=1)
 
 class ConstraintsFrame(tk.Frame):
     """Frame to handle selection of which constraints are applied where.
@@ -1879,12 +1411,9 @@ class KernelFrame(tk.Frame):
         self.k = self.kernel_type_frame.k_var.get()
         
         # Create frame to hold hyperparameter bounds:
-        self.bounds_label = tk.Label(self, text="hyperparameter priors:")
+        self.bounds_label = tk.Label(self, text="hyperparameter bounds:")
         self.bounds_label.grid(row=2, sticky='W')
-        self.bounds_frame = KernelBoundsFrame(
-            HYPERPARAMETERS[self.kernel_type_frame.k_var.get()],
-            self
-        )
+        self.bounds_frame = KernelBoundsFrame(HYPERPARAMETERS[self.kernel_type_frame.k_var.get()], self)
         self.bounds_frame.grid(row=3, sticky='EW')
         
         # Create frame to hold constraint checkboxes:
@@ -1954,39 +1483,32 @@ class MCMCFrame(tk.Frame):
         
         self.walker_label = tk.Label(self, text="walkers:")
         self.walker_label.grid(row=0, column=0, sticky='E')
-        self.walker_box = tk.Entry(self, width=3)
+        self.walker_box = tk.Entry(self, width=4)
         self.walker_box.insert(tk.END, '200')
         self.walker_box.grid(row=0, column=1, sticky='EW')
         
         self.sample_label = tk.Label(self, text="samples:")
         self.sample_label.grid(row=0, column=2, sticky='E')
-        self.sample_box = tk.Entry(self, width=3)
+        self.sample_box = tk.Entry(self, width=4)
         self.sample_box.insert(tk.END, '200')
         self.sample_box.grid(row=0, column=3, sticky='EW')
         
         self.burn_label = tk.Label(self, text="burn:")
         self.burn_label.grid(row=0, column=4, sticky='E')
-        self.burn_box = tk.Entry(self, width=3)
+        self.burn_box = tk.Entry(self, width=4)
         self.burn_box.insert(tk.END, '100')
         self.burn_box.grid(row=0, column=5, sticky='EW')
         
         self.keep_label = tk.Label(self, text="keep:")
         self.keep_label.grid(row=0, column=6, sticky='E')
-        self.keep_box = tk.Entry(self, width=3)
+        self.keep_box = tk.Entry(self, width=4)
         self.keep_box.insert(tk.END, '200')
         self.keep_box.grid(row=0, column=7, sticky='EW')
-        
-        self.a_label = tk.Label(self, text="a:")
-        self.a_label.grid(row=0, column=8, sticky='E')
-        self.a_box = tk.Entry(self, width=3)
-        self.a_box.insert(tk.END, '2')
-        self.a_box.grid(row=0, column=9, sticky='EW')
         
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure(3, weight=1)
         self.grid_columnconfigure(5, weight=1)
         self.grid_columnconfigure(7, weight=1)
-        self.grid_columnconfigure(9, weight=1)
 
 class MCMCConstraintFrame(tk.Frame):
     """Frame to hold selection of properties of full Monte Carlo sampling.
@@ -2012,7 +1534,6 @@ class MCMCConstraintFrame(tk.Frame):
         self.samples_label.grid(row=0, column=1, sticky='E')
         
         self.samples_box = tk.Entry(self, width=4)
-        self.samples_box.insert(0, 500)
         self.samples_box.grid(row=0, column=2, sticky='EW')
         
         # Create button to select positivity constraint:
@@ -2133,17 +1654,14 @@ class EvaluationFrame(tk.Frame):
         
         # Create labels and boxes for setting parameters:
         self.npts_box = tk.Entry(self, width=4)
-        self.npts_box.insert(0, '400')
         self.npts_box.grid(row=1, column=1, sticky='EW')
         self.npts_label = tk.Label(self, text="points from")
         self.npts_label.grid(row=1, column=2)
         self.x_min_box = tk.Entry(self, width=4)
-        self.x_min_box.insert(0, '0.0')
         self.x_min_box.grid(row=1, column=3, sticky='EW')
         self.to_label = tk.Label(self, text="to")
         self.to_label.grid(row=1, column=4)
         self.x_max_box = tk.Entry(self, width=4)
-        self.x_max_box.insert(0, '1.2')
         self.x_max_box.grid(row=1, column=5, sticky='EW')
         
         self.x_points_box = tk.Entry(self)
@@ -2254,7 +1772,12 @@ class StatusBox(tk.Frame):
         self.history_box.grid(row=1, sticky='EWNS')
         self.add_line(
             'This is {progname} version {ver}, launched at {time}. {cores} '
-            'cores detected.'.format(
+            'cores detected.\n{progname} IS DEPRECATED. YOU SHOULD USE gpfit '
+            'FOR FUTURE ANALYSIS. gpfit adds the ability to save/restore '
+            'settings, supports more advanced specification of the priors for '
+            'hyperparameters and has new default priors informed by detailed '
+            'analysis of synthetic data. {progname} has been left in place so '
+            'that old analysis codes will continue to function.'.format(
                 progname=PROG_NAME,
                 ver=__version__,
                 time=time.strftime(DATE_FORMAT),
@@ -2290,27 +1813,16 @@ class ControlBox(tk.Frame):
         tk.Frame.__init__(self, *args, **kwargs)
         
         # Create buttons:
-        self.top_frame = tk.Frame(self)
-        self.load_button = tk.Button(self.top_frame, text="load data", command=self.master.master.load_data)
-        self.load_button.grid(row=0, column=0)
-        self.avg_button = tk.Button(self.top_frame, text="plot data", command=self.master.master.average_data)
-        self.avg_button.grid(row=0, column=1)
-        self.fit_button = tk.Button(self.top_frame, text="fit data", command=self.master.master.fit_data)
-        self.fit_button.grid(row=0, column=2)
-        self.save_button = tk.Button(self.top_frame, text="save fit", command=self.master.master.save_fit)
-        self.save_button.grid(row=0, column=3)
-        self.top_frame.grid(row=0, column=0, sticky='EW')
-        
-        self.bottom_frame = tk.Frame(self)
-        self.save_state_button = tk.Button(self.bottom_frame, text="save state", command=self.master.master.save_state)
-        self.save_state_button.grid(row=0, column=0)
-        self.load_state_button = tk.Button(self.bottom_frame, text="load state", command=self.master.master.load_state)
-        self.load_state_button.grid(row=0, column=1)
-        self.exit_button = tk.Button(self.bottom_frame, text="exit", command=self.master.master.exit)
-        self.exit_button.grid(row=0, column=2)
-        self.bottom_frame.grid(row=1, column=0, sticky='EW')
-        
-        self.grid_columnconfigure(0, weight=1)
+        self.load_button = tk.Button(self, text="load data", command=self.master.master.load_data)
+        self.load_button.grid(row=1, column=0)
+        self.avg_button = tk.Button(self, text="plot data", command=self.master.master.average_data)
+        self.avg_button.grid(row=1, column=1)
+        self.fit_button = tk.Button(self, text="fit data", command=self.master.master.fit_data)
+        self.fit_button.grid(row=1, column=2)
+        self.save_button = tk.Button(self, text="save fit", command=self.master.master.save_fit)
+        self.save_button.grid(row=1, column=3)
+        self.exit_button = tk.Button(self, text="exit", command=self.master.master.exit)
+        self.exit_button.grid(row=1, column=4)
 
 class PlotFrame(tk.Frame):
     """Frame to hold the plots.
@@ -2608,7 +2120,7 @@ class FitWindow(tk.Tk):
                         shot,
                         tree=EFIT_tree_name
                     )
-                except:
+                except MDSplus.TreeException as e:
                     self.control_frame.status_frame.add_line(
                         "Could not load EFIT data from tree %s! Loading of data "
                         "from tree failed." % (EFIT_tree_name,)
@@ -2632,44 +2144,10 @@ class FitWindow(tk.Tk):
                 )
                 try:
                     if signal == 'ne':
-                        kwargs = {}
-                        if system == 'TCI':
-                            try:
-                                kwargs['TCI_quad_points'] = int(
-                                    self.control_frame.data_source_frame.TCI_frame.TCI_points_box.get()
-                                )
-                            except ValueError:
-                                self.control_frame.status_frame.add_line(
-                                    "Invalid value for number of TCI quadrature "
-                                    "points! Loading of data from tree failed."
-                                )
-                                return
-                            try:
-                                kwargs['TCI_thin'] = int(
-                                    self.control_frame.data_source_frame.TCI_frame.TCI_thin_box.get()
-                                )
-                            except ValueError:
-                                self.control_frame.status_frame.add_line(
-                                    "Invalid value for TCI thinning! Loading of "
-                                    "data from tree failed."
-                                )
-                                return
-                            try:
-                                kwargs['TCI_ds'] = float(
-                                    self.control_frame.data_source_frame.TCI_frame.TCI_ds_box.get()
-                                )
-                            except ValueError:
-                                self.control_frame.status_frame.add_line(
-                                    "Invalid value for TCI step size! Loading of "
-                                    "data from tree failed."
-                                )
-                                return
-                        
                         self.master_p[system] = profiletools.ne(
                             shot,
                             include=[system],
-                            efit_tree=self.efit_tree,
-                            **kwargs
+                            efit_tree=self.efit_tree
                         )
                     elif signal == 'Te':
                         # Don't remove the ECE edge here, since it still has ALL
@@ -2776,8 +2254,8 @@ class FitWindow(tk.Tk):
                 )
             if hasattr(self.master_p[base], 'times'):
                 self.control_frame.averaging_frame.time_window_frame.point_button.invoke()
-                self.control_frame.averaging_frame.time_window_frame.times_box.times_box.delete(0, tk.END)
-                self.control_frame.averaging_frame.time_window_frame.times_box.times_box.insert(
+                self.control_frame.averaging_frame.time_window_frame.times_box.delete(0, tk.END)
+                self.control_frame.averaging_frame.time_window_frame.times_box.insert(
                     0, str(self.master_p[base].times)[1:-1]
                 )
             # Set the coordinate selector
@@ -2831,7 +2309,7 @@ class FitWindow(tk.Tk):
         else:
             s_times = re.findall(
                 LIST_REGEX,
-                self.control_frame.averaging_frame.time_window_frame.times_box.times_box.get()
+                self.control_frame.averaging_frame.time_window_frame.times_box.get()
             )
             for t in s_times:
                 try:
@@ -2843,14 +2321,6 @@ class FitWindow(tk.Tk):
             if not times:
                 self.control_frame.status_frame.add_line(
                     "No valid points in time points. No bounding applied."
-                )
-            try:
-                tol = float(self.control_frame.averaging_frame.time_window_frame.times_box.times_tol_box.get())
-            except ValueError:
-                tol = None
-                self.control_frame.status_frame.add_line(
-                    "No tolerance for time points specified, points used may "
-                    "be arbitrarily far from points requested."
                 )
         
         # Keep a deepcopy so we don't mutate the master data that have been
@@ -2890,7 +2360,7 @@ class FitWindow(tk.Tk):
                                 pt.T = pt.T[good_idxs]
                     else:
                         if times:
-                            p.keep_times(times, tol=tol)
+                            p.keep_times(times)
                 # Convert abscissa if needed:
                 try:
                     p.convert_abscissa(abscissa)
@@ -2912,31 +2382,6 @@ class FitWindow(tk.Tk):
                 # complete:
                 if 'GPC' in k or 'ECE' in k or core_only:
                     p.remove_edge_points()
-                
-                # Fudge the uncertainty if requested:
-                if self.control_frame.averaging_frame.fudge_frame.fudge_state.get():
-                    try:
-                        fudge_val = float(self.control_frame.averaging_frame.fudge_frame.fudge_value_box.get())
-                    except ValueError:
-                        fudge_val = -1.0
-                    if fudge_val < 0:
-                        self.control_frame.status_frame.add_line(
-                            "Invalid value for uncertainty adjustment, uncertainties "
-                            "will not be adjusted!"
-                        )
-                        fudge_val = 0.0
-                    if self.control_frame.averaging_frame.fudge_frame.fudge_type_var.get() == 'absolute':
-                        new_err_y = fudge_val * scipy.ones_like(p.err_y)
-                    else:
-                        new_err_y = fudge_val * p.y
-                    fudge_method = self.control_frame.averaging_frame.fudge_frame.fudge_method_var.get()
-                    if fudge_method == 'override':
-                        p.err_y = new_err_y
-                    elif fudge_method == 'minimum':
-                        bad_idx = (p.err_y <= new_err_y)
-                        p.err_y[bad_idx] = new_err_y[bad_idx]
-                    else:
-                        p.err_y = scipy.sqrt(p.err_y**2 + new_err_y**2)
                 
                 # Plot the data channel-by-channel so it gets color-coded right:
                 p.plot_data(ax=self.plot_frame.a_val, fmt=next(markercycle))
@@ -2969,9 +2414,7 @@ class FitWindow(tk.Tk):
                 try:
                     self.extreme_flagged = self.combined_p.remove_extreme_changes(
                         thresh=float(self.control_frame.outlier_frame.extreme_thresh_box.get()),
-                        mask_only=True,
-                        # TEMPORARY TEST!!!
-                        # logic='or'
+                        mask_only=True
                     )
                     y_bad_c = self.combined_p.y[self.extreme_flagged]
                     X_bad_c = self.combined_p.X[self.extreme_flagged, :].ravel()
@@ -3059,19 +2502,37 @@ class FitWindow(tk.Tk):
         If a field is blank, take the bound from the GP's hyperprior. If a field
         is populated, put that into the GP's hyperprior.
         """
-        hyperpriors = [
-            hf.get_hyperprior() for hf in self.control_frame.kernel_frame.bounds_frame.hyperprior_frames
-        ]
-        # Use a conditional in case there is a kernel with no hyperparameters:
-        if hyperpriors:
-            hyperprior = hyperpriors.pop(0)
-            for hp in hyperpriors:
-                try:
-                    hyperprior *= hp
-                except TypeError:
-                    return False
-            self.combined_p.gp.k.hyperprior = hyperprior
-        return True
+        for k, l, u in zip(list(range(0, len(self.combined_p.gp.free_param_bounds))),
+                           self.control_frame.kernel_frame.bounds_frame.lower_bounds,
+                           self.control_frame.kernel_frame.bounds_frame.upper_bounds):
+            old_bounds = self.combined_p.gp.free_param_bounds[k]
+            new_bounds = list(old_bounds)
+            
+            new_lb = l.get()
+            try:
+                new_bounds[0] = float(new_lb)
+            except ValueError:
+                if new_lb == '':
+                    l.insert(0, str(old_bounds[0]))
+                else:
+                    self.control_frame.status_frame.add_line(
+                        "Invalid lower bound %s for %s, will use default value "
+                        "instead." % (new_lb, k,)
+                    )
+                
+            new_ub = u.get()
+            try:
+                new_bounds[1] = float(new_ub)
+            except ValueError:
+                if new_ub == '':
+                    u.insert(0, str(old_bounds[1]))
+                else:
+                    self.control_frame.status_frame.add_line(
+                        "Invalid upper bound %s for %s, will use default value "
+                        "instead." % (new_ub, k,)
+                    )
+            
+            self.combined_p.gp.free_param_bounds[k] = new_bounds
     
     def fit_data(self):
         """Perform the actual fit and evaluation.
@@ -3124,10 +2585,7 @@ class FitWindow(tk.Tk):
                 return
         
         self.control_frame.status_frame.add_line("Creating Gaussian process...")
-        res = self.create_gp()
-        if not res:
-            self.control_frame.status_frame.add_line("Failed creating Gaussian process!")
-            return
+        self.create_gp()
         self.control_frame.status_frame.add_line("Gaussian process created.")
         
         # Process outliers:
@@ -3477,9 +2935,9 @@ class FitWindow(tk.Tk):
                 cov_w2_vol_avg = res['special_cov'][0, 1]
                 self.mean_peaking = mean_w2 / self.mean_vol_avg
                 self.std_peaking = scipy.sqrt(
-                    std_w2**2 / self.mean_vol_avg**2 +
-                    self.std_vol_avg**2 * mean_w2**2 / self.mean_vol_avg**4 -
-                    2.0 * cov_w2_vol_avg * mean_w2 / self.mean_vol_avg**3
+                    std_w2 / self.mean_vol_avg**2 +
+                    self.std_vol_avg * mean_w2**2 / self.mean_vol_avg**4 -
+                    cov_w2_vol_avg * mean_w2 / self.mean_vol_avg**3
                 )
                 self.control_frame.status_frame.add_line(
                     u"Peaking is %g\u00b1%g"
@@ -3496,12 +2954,7 @@ class FitWindow(tk.Tk):
         
         self.res = res
         self.X = X
-
-        self.plot_fit()
         
-        self.control_frame.status_frame.add_line("Fitting complete.")
-    
-    def plot_fit(self):
         # Delete old lines, envelopes:
         for line in self.l:
             try:
@@ -3516,34 +2969,34 @@ class FitWindow(tk.Tk):
         
         # Plot the fits:
         self.l, self.e = gptools.univariate_envelope_plot(
-            self.X,
-            self.res['mean_val'],
-            self.res['std_val'],
+            X,
+            res['mean_val'],
+            res['std_val'],
             ax=self.plot_frame.a_val,
             color='b'
         )
         
         if self.control_frame.eval_frame.a_L_state.get():
             color = plt.getp(self.l[0], 'color')
-            core_mask = self.X <= 1
+            core_mask = X <= 1
             l, e = gptools.univariate_envelope_plot(
-                self.X,
-                self.res['mean_grad'],
-                self.res['std_grad'],
+                X,
+                res['mean_grad'],
+                res['std_grad'],
                 ax=self.plot_frame.a_grad,
                 color=color
             )
             self.plot_frame.a_grad.set_ylim(
-                bottom=(self.res['mean_grad'][core_mask] - 3 * self.res['std_grad'][core_mask]).min(),
-                top=(self.res['mean_grad'][core_mask] + 3 * self.res['std_grad'][core_mask]).max()
+                bottom=(res['mean_grad'][core_mask] - 3 * res['std_grad'][core_mask]).min(),
+                top=(res['mean_grad'][core_mask] + 3 * res['std_grad'][core_mask]).max()
             )
             self.l.extend(l)
             self.e.extend(e)
             
             l, e = gptools.univariate_envelope_plot(
-                self.X,
-                self.res['mean_a_L'],
-                self.res['std_a_L'],
+                X,
+                res['mean_a_L'],
+                res['std_a_L'],
                 ax=self.plot_frame.a_a_L,
                 color=color
             )
@@ -3551,8 +3004,8 @@ class FitWindow(tk.Tk):
             # Avoid bug in MPL v. 1.4.2:
             if matplotlib.__version__ != '1.4.2':
                 self.plot_frame.a_a_L.set_ylim(
-                    bottom=(self.res['mean_a_L'][core_mask] - 3 * self.res['std_a_L'][core_mask]).min(),
-                    top=(self.res['mean_a_L'][core_mask] + 3 * self.res['std_a_L'][core_mask]).max()
+                    bottom=(res['mean_a_L'][core_mask] - 3 * res['std_a_L'][core_mask]).min(),
+                    top=(res['mean_a_L'][core_mask] + 3 * res['std_a_L'][core_mask]).max()
                 )
             self.l.extend(l)
             self.e.extend(e)
@@ -3567,70 +3020,52 @@ class FitWindow(tk.Tk):
         if X_units:
             X_units = '/' + X_units
         combined_units = y_units + X_units
-        # Use translate instead of strip in case there are buried $'s. This
-        # might be ugly with mixed-math y/X-labels, but will be better than
-        # causing the math to go fubar.
         if combined_units != '1':
             label = "$d%s/d%s$ [%s]" % (
-                self.combined_p.y_label.translate(None, '$'),
-                self.combined_p.X_labels[0].translate(None, '$'),
+                self.combined_p.y_label.strip('$'),
+                self.combined_p.X_labels[0].strip('$'),
                 combined_units
             )
         else:
             label = "$d%s/d%s$" % (
-                self.combined_p.y_label.translate(None, '$'),
+                self.combined_p.y_label.strip('$'),
                 self.combined_p.X_labels[0]
             )
         self.plot_frame.a_grad.set_ylabel(label)
         
         self.plot_frame.a_a_L.set_ylabel(
-            "$a/L_{%s}$" % (self.combined_p.y_label.translate(None, '$'),)
+            "$a/L_{%s}$" % (self.combined_p.y_label.strip('$'),)
         )
         
         self.control_frame.plot_param_frame.update_limits()
-
+        
         self.plot_frame.a_val.legend(loc='best', fontsize=12, ncol=2)
         self.plot_frame.canvas.draw()
         self.plot_frame.canvas._tkcanvas.focus_set()
+        self.control_frame.status_frame.add_line("Fitting complete.")
     
     def create_gp(self):
         """Create the Gaussian process from the combined profile.
         """
         # Remove points that were flagged by the user:
         s_flagged_idxs = re.findall(
-            RANGE_LIST_REGEX,
+            LIST_REGEX,
             self.control_frame.outlier_frame.specific_box.get()
         )
         flagged_idxs = set()
         for s in s_flagged_idxs:
-            if ':' in s or '-' in s:
-                try:
-                    start, stop = re.split('[:-]', s)
-                    start = int(start)
-                    stop = int(stop)
-                    if stop <= start:
-                        raise ValueError("stop <= start")
-                    if start < 0 or stop >= len(self.combined_p.y):
-                        raise ValueError("out of bounds!")
-                    else:
-                        flagged_idxs.update(list(range(start, stop + 1)))
-                except ValueError:
+            try:
+                i = float(s)
+                if i >= len(self.combined_p.y):
                     self.control_frame.status_frame.add_line(
-                        "Invalid range %s, will be ignored." % (s,)
+                        "Value %d out of range, will be ignored." % (i,)
                     )
-            else:
-                try:
-                    i = int(s)
-                    if i >= len(self.combined_p.y) or i < 0:
-                        self.control_frame.status_frame.add_line(
-                            "Value %d out of range, will be ignored." % (i,)
-                        )
-                    else:
-                        flagged_idxs.add(i)
-                except ValueError:
-                    self.control_frame.status_frame.add_line(
-                        "Invalid index to remove '%s', will be ignored." % (s,)
-                    )
+                else:
+                    flagged_idxs.add(i)
+            except ValueError:
+                self.control_frame.status_frame.add_line(
+                    "Invalid index to remove '%s', will be ignored." % (s,)
+                )
         flagged_idxs = list(flagged_idxs)
         if self.flagged_plt is not None:
             for p in self.flagged_plt:
@@ -3651,10 +3086,15 @@ class FitWindow(tk.Tk):
         mask[flagged_idxs] = False
         # Mask out outliers and extreme changes:
         mask = mask & (~self.extreme_flagged) & (~self.outlier_flagged)
+        k = self.control_frame.kernel_frame.kernel_type_frame.k_var.get()
+        if k == 'gibbstanh':
+            k = 'gibbstanhlegacy'
         self.combined_p.create_gp(
-            k=self.control_frame.kernel_frame.kernel_type_frame.k_var.get(),
+            k=k,
             constrain_slope_on_axis=False,
             constrain_at_limiter=False,
+            upper_factor=args.upper_factor,
+            lower_factor=args.lower_factor,
             mask=mask
         )
         # Process core constraint:
@@ -3718,11 +3158,8 @@ class FitWindow(tk.Tk):
                         err_y=0.1,
                         n=1
                     )
-        # This needs to be called again
-        if len(self.combined_p.transformed) > 0:
-            self.combined_p.gp.condense_duplicates()
         # Process bounds:
-        return self.process_bounds()
+        self.process_bounds()
     
     def find_MAP(self):
         """Find the MAP estimate for the hyperparameters.
@@ -3789,19 +3226,10 @@ class FitWindow(tk.Tk):
             )
             self.sampler = None
             return
-        try:
-            a = float(self.control_frame.fitting_frame.MCMC_frame.a_box.get())
-        except ValueError:
-            self.control_frame.status_frame.add_line(
-                "Invalid sampler proposal width! Evaluation failed."
-            )
-            self.sampler = None
-            return
         self.sampler = self.combined_p.gp.sample_hyperparameter_posterior(
             nsamp=samples,
             nwalkers=walkers,
-            sampler=self.sampler,
-            sampler_a=a
+            sampler=self.sampler
         )
     
     def save_fit(self, save_plot=False):
@@ -3810,14 +3238,7 @@ class FitWindow(tk.Tk):
         if self.res is None:
             self.fit_data()
         if not args.output_filename:
-            path = tkinter.filedialog.asksaveasfilename(
-                filetypes=[
-                    ('all files', '*'),
-                    ('NetCDF', ('*.nc', '*.cdf', '*.dat')),
-                    ('Pickle', '*.pkl'),
-                    ('CSV', '*.csv')
-                ]
-            )
+            path = tkinter.filedialog.asksaveasfilename()
         else:
             path = args.output_filename
         if path:
@@ -3981,11 +3402,8 @@ class FitWindow(tk.Tk):
                     res_dict['peaking'] = self.mean_peaking
                     res_dict['err_peaking'] = self.std_peaking
                 
-                if self.save_state:
-                    res_dict['state'] = self.package_state()
-                
                 with open(os.path.expanduser(path), 'wb') as f:
-                    pickle.dump(res_dict, f, protocol=pickle.HIGHEST_PROTOCOL)
+                    pickle.dump(res_dict, f)
             else:
                 # Write output to NetCDF file:
                 self.control_frame.status_frame.add_line(
@@ -4026,11 +3444,7 @@ class FitWindow(tk.Tk):
                         f.peaking = self.mean_peaking
                         f.err_peaking = self.std_peaking
                     
-                    if self.save_state:
-                        f.state = pickle.dumps(self.package_state(), protocol=pickle.HIGHEST_PROTOCOL)
-                    
                     f.x_name = X_name
-                    f.y_name = y_name
                     f.createDimension(X_name, len(self.X))
                     v_X = f.createVariable(X_name, float, (X_name,))
                     v_X[:] = self.X
@@ -4059,647 +3473,6 @@ class FitWindow(tk.Tk):
             self.control_frame.status_frame.add_line(
                 "Done writing results."
             )
-    
-    def package_state(self):
-        """Create a dictionary representing the internal state of the program.
-        """
-        state = {}
-        
-        # From the tree/file selector frame:
-        state['data source'] = self.control_frame.data_source_frame.tree_file_frame.source_state.get()
-        state['file path'] = self.control_frame.data_source_frame.tree_file_frame.path_entry.get()
-        
-        # From the variable/column name frame:
-        state['time name'] = self.control_frame.data_source_frame.variable_name_frame.time_box.get()
-        state['space name'] = self.control_frame.data_source_frame.variable_name_frame.space_box.get()
-        state['data name'] = self.control_frame.data_source_frame.variable_name_frame.data_box.get()
-        state['meta name'] = self.control_frame.data_source_frame.variable_name_frame.meta_box.get()
-        
-        # From the shot number frame:
-        state['shot'] = self.control_frame.data_source_frame.shot_frame.shot_box.get()
-        
-        # From the signal/coordinate selector frame:
-        state['signal'] = self.control_frame.data_source_frame.signal_coordinate_frame.signal_var.get()
-        state['coordinate'] = self.control_frame.data_source_frame.signal_coordinate_frame.coordinate_var.get()
-        
-        # From the TCI parameter frame:
-        state['TCI quad points'] = self.control_frame.data_source_frame.TCI_frame.TCI_points_box.get()
-        state['TCI thin'] = self.control_frame.data_source_frame.TCI_frame.TCI_thin_box.get()
-        state['TCI ds'] = self.control_frame.data_source_frame.TCI_frame.TCI_ds_box.get()
-        
-        # From the system selector frame:
-        state['system states'] = [
-            b.state_var.get() for b in self.control_frame.data_source_frame.system_frame.buttons
-        ]
-        
-        # From the EFIT parameter frame:
-        state['EFIT tree name'] = self.control_frame.data_source_frame.EFIT_frame.EFIT_field.get()
-        
-        # From the time window selection frame:
-        state['time method'] = self.control_frame.averaging_frame.time_window_frame.method_state.get()
-        state['t min'] = self.control_frame.averaging_frame.time_window_frame.t_min_box.get()
-        state['t max'] = self.control_frame.averaging_frame.time_window_frame.t_max_box.get()
-        state['times'] = self.control_frame.averaging_frame.time_window_frame.times_box.times_box.get()
-        state['times tol'] = self.control_frame.averaging_frame.time_window_frame.times_box.times_tol_box.get()
-        
-        # From the averaging method frame:
-        state['averaging method'] = self.control_frame.averaging_frame.method_frame.method_var.get()
-        state['uncertainty method'] = self.control_frame.averaging_frame.method_frame.error_method_var.get()
-        state['weighting state'] = self.control_frame.averaging_frame.method_frame.weighted_state.get()
-        
-        # From the uncertainty adjustment frame:
-        state['uncertainty adjust state'] = self.control_frame.averaging_frame.fudge_frame.fudge_state.get()
-        state['uncertainty adjust method'] = self.control_frame.averaging_frame.fudge_frame.fudge_method_var.get()
-        state['uncertainty adjust type'] = self.control_frame.averaging_frame.fudge_frame.fudge_type_var.get()
-        state['uncertainty adjust value'] = self.control_frame.averaging_frame.fudge_frame.fudge_value_box.get()
-        
-        # From the kernel type frame:
-        state['kernel type'] = self.control_frame.kernel_frame.kernel_type_frame.k_var.get()
-        state['core only state'] = self.control_frame.kernel_frame.kernel_type_frame.core_only_state.get()
-        
-        # From the hyperprior frames:
-        state['hyperprior types'] = [
-            hf.hp_type_var.get() for hf in self.control_frame.kernel_frame.bounds_frame.hyperprior_frames
-        ]
-        state['hyperhyperparameter states'] = [
-            [
-                b.get() for b in hf.hyperhyperparameter_frame.boxes
-            ] for hf in self.control_frame.kernel_frame.bounds_frame.hyperprior_frames
-        ]
-        
-        # From the constraint frame:
-        state['core constraint state'] = self.control_frame.kernel_frame.constraints_frame.core_state.get()
-        state['edge constraint state'] = self.control_frame.kernel_frame.constraints_frame.edge_state.get()
-        state['core locations'] = self.control_frame.kernel_frame.constraints_frame.core_loc.get()
-        state['edge locations'] = self.control_frame.kernel_frame.constraints_frame.edge_loc.get()
-        
-        # From the fitting method frame:
-        state['fitting method state'] = self.control_frame.fitting_frame.method_frame.method_state.get()
-        state['random starts'] = self.control_frame.fitting_frame.method_frame.starts_box.get()
-        
-        # From the MCMC parameter frame:
-        state['MCMC walkers'] = self.control_frame.fitting_frame.MCMC_frame.walker_box.get()
-        state['MCMC samples'] = self.control_frame.fitting_frame.MCMC_frame.sample_box.get()
-        state['MCMC burn'] = self.control_frame.fitting_frame.MCMC_frame.burn_box.get()
-        state['MCMC keep'] = self.control_frame.fitting_frame.MCMC_frame.keep_box.get()
-        state['MCMC a'] = self.control_frame.fitting_frame.MCMC_frame.a_box.get()
-        
-        # From the full MC constraint frame:
-        state['full MC state'] = self.control_frame.fitting_frame.MCMC_constraint_frame.full_MC_state.get()
-        state['full MC samples'] = self.control_frame.fitting_frame.MCMC_constraint_frame.samples_box.get()
-        state['positivity constraint state'] = self.control_frame.fitting_frame.MCMC_constraint_frame.pos_state.get()
-        state['monotonicity constraint state'] = self.control_frame.fitting_frame.MCMC_constraint_frame.mono_state.get()
-        
-        # From the evaluation frame:
-        state['evaluation method state'] = self.control_frame.eval_frame.method_state.get()
-        state['num evaluation points'] = self.control_frame.eval_frame.npts_box.get()
-        state['evaluation x min'] = self.control_frame.eval_frame.x_min_box.get()
-        state['evaluation x max'] = self.control_frame.eval_frame.x_max_box.get()
-        state['evaluation specific x points'] = self.control_frame.eval_frame.x_points_box.get()
-        state['compute a/L state'] = self.control_frame.eval_frame.a_L_state.get()
-        state['compute volume average state'] = self.control_frame.eval_frame.vol_avg_state.get()
-        state['compute peaking state'] = self.control_frame.eval_frame.peaking_state.get()
-        state['compute TCI state'] = self.control_frame.eval_frame.TCI_state.get()
-        
-        # From the outlier rejection frame:
-        state['extreme change rejection state'] = self.control_frame.outlier_frame.extreme_state.get()
-        state['outlier rejection state'] = self.control_frame.outlier_frame.outlier_state.get()
-        state['extreme change threshold'] = self.control_frame.outlier_frame.extreme_thresh_box.get()
-        state['outlier rejection threshold'] = self.control_frame.outlier_frame.outlier_thresh_box.get()
-        state['specific flagged points state'] = self.control_frame.outlier_frame.specific_box.get()
-        state['show idx state'] = self.control_frame.outlier_frame.show_idx_state.get()
-        
-        # From the plot parameters frame:
-        state['plot x lb'] = self.control_frame.plot_param_frame.x_lb_box.get()
-        state['plot x ub'] = self.control_frame.plot_param_frame.x_ub_box.get()
-        state['plot y lb'] = self.control_frame.plot_param_frame.y_lb_box.get()
-        state['plot y ub'] = self.control_frame.plot_param_frame.y_ub_box.get()
-        state['plot dy lb'] = self.control_frame.plot_param_frame.dy_lb_box.get()
-        state['plot dy ub'] = self.control_frame.plot_param_frame.dy_ub_box.get()
-        state['plot aLy lb'] = self.control_frame.plot_param_frame.aLy_lb_box.get()
-        state['plot aLy ub'] = self.control_frame.plot_param_frame.aLy_ub_box.get()
-        
-        # Data stored directly in self:
-        state['master p'] = self.master_p
-        state['p'] = self.p
-        state['combined_p'] = self.combined_p
-        state['X'] = self.X
-        try:
-            if not self.save_cov:
-                self.res.pop('cov', None)
-        except:
-            pass
-        state['res'] = self.res
-        try:
-            state['efit_tree'] = self.efit_tree
-        except AttributeError:
-            state['efit_tree'] = None
-        try:
-            if self.save_sampler:
-                # Need to close out the pool:
-                self.sampler.pool.close()
-                self.sampler.pool = None
-                state['sampler'] = self.sampler
-            else:
-                state['sampler'] = None
-        except AttributeError:
-            state['sampler'] = None
-        try:
-            state['mean_peaking'] = self.mean_peaking
-        except AttributeError:
-            state['mean_peaking'] = None
-        try:
-            state['std_peaking'] = self.std_peaking
-        except AttributeError:
-            state['std_peaking'] = None
-        try:
-            state['mean_vol_avg'] = self.mean_vol_avg
-        except AttributeError:
-            state['mean_vol_avg'] = None
-        try:
-            state['std_vol_avg'] = self.std_vol_avg
-        except AttributeError:
-            state['std_vol_avg'] = None
-        try:
-            state['extreme_flagged'] = self.extreme_flagged
-        except AttributeError:
-            state['extreme_flagged'] = None
-        try:
-            state['outlier_flagged'] = self.outlier_flagged
-        except AttributeError:
-            state['outlier_flagged'] = None
-        
-        return state
-    
-    def parcel_state(self, path):
-        state = self.package_state()
-        for k, v in state.items():
-            k = k.replace('/', '_')
-            with open(os.path.abspath(os.path.join(path, k + '.pkl')), 'wb') as f:
-                pickle.dump(v, f)
-    
-    def save_state(self):
-        path = tkinter.filedialog.asksaveasfilename(
-            defaultextension='.gpfit',
-            filetypes=[
-                ('gpfit', '*.gpfit'),
-                ('all files', '*')
-            ]
-        )
-        if path:
-            with open(os.path.expanduser(path), 'wb') as outfile:
-                pickle.dump(self.package_state(), outfile, protocol=pickle.HIGHEST_PROTOCOL)
-            self.control_frame.status_frame.add_line(
-                "Done writing state."
-            )
-    
-    def load_state(self, path=None):
-        """Load the state information from the selected file.
-        """
-        if path is None:
-            path = tkinter.filedialog.askopenfilename(
-                filetypes=[
-                    ('all files', '*'),
-                    ('gpfit state files', '*.gpfit'),
-                    ('NetCDF files', ('*.nc', '*.cdf', '*.dat')),
-                    ('Pickle files', '*.pkl')
-                ]
-            )
-        if path:
-            root, ext = os.path.splitext(path)
-            
-            if ext == '.csv':
-                self.control_frame.status_frame.add_line(
-                    "Cannot load state information from CSV file!"
-                )
-                return
-            elif ext == '.gpfit':
-                with open(os.path.expanduser(path), 'rb') as infile:
-                    state = pickle.load(infile)
-            elif ext == '.pkl':
-                with open(os.path.expanduser(path), 'rb') as infile:
-                    try:
-                        state = pickle.load(infile)['state']
-                    except KeyError:
-                        self.control_frame.status_frame.add_line(
-                            "No state information in pickle file %s!" % (path,)
-                        )
-                        return
-            else:
-                try:
-                    with scipy.io.netcdf.netcdf_file(os.path.expanduser(path), mode='r') as f:
-                        try:
-                            state = pickle.loads(f.state)
-                        except AttributeError:
-                            self.control_frame.status_frame.add_line(
-                                "No state information in NetCDF file %s!" % (path,)
-                            )
-                            return
-                except TypeError:
-                    self.control_frame.status_frame.add_line(
-                        "Unknown file type for file %s! (Tried to treat as NetCDF.)" % (path,)
-                    )
-                    return
-            
-            self.apply_state(state)
-            self.control_frame.status_frame.add_line(
-                "Done loading state."
-            )
-    
-    def apply_state(self, state):
-        """Apply the given state dictionary.
-        """
-        self.control_frame.data_source_frame.tree_file_frame.source_state.set(state['data source'])
-        self.control_frame.data_source_frame.update_source()
-        impose_entry(
-            self.control_frame.data_source_frame.tree_file_frame.path_entry,
-            state['file path']
-        )
-        
-        impose_entry(
-            self.control_frame.data_source_frame.variable_name_frame.time_box,
-            state['time name']
-        )
-        impose_entry(
-            self.control_frame.data_source_frame.variable_name_frame.space_box,
-            state['space name']
-        )
-        impose_entry(
-            self.control_frame.data_source_frame.variable_name_frame.data_box,
-            state['data name']
-        )
-        impose_entry(
-            self.control_frame.data_source_frame.variable_name_frame.meta_box,
-            state['meta name']
-        )
-        
-        impose_entry(
-            self.control_frame.data_source_frame.shot_frame.shot_box,
-            state['shot']
-        )
-        
-        self.control_frame.data_source_frame.signal_coordinate_frame.signal_var.set(state['signal'])
-        self.control_frame.data_source_frame.update_signal(state['signal'])
-        self.control_frame.data_source_frame.signal_coordinate_frame.coordinate_var.set(state['coordinate'])
-        
-        impose_entry(
-            self.control_frame.data_source_frame.TCI_frame.TCI_points_box,
-            state['TCI quad points']
-        )
-        impose_entry(
-            self.control_frame.data_source_frame.TCI_frame.TCI_thin_box,
-            state['TCI thin']
-        )
-        impose_entry(
-            self.control_frame.data_source_frame.TCI_frame.TCI_ds_box,
-            state['TCI ds']
-        )
-        
-        for b, s in zip(
-                self.control_frame.data_source_frame.system_frame.buttons,
-                state['system states']
-            ):
-            b.state_var.set(s)
-            if b.system == 'TCI':
-                b.invoke_TCI()
-        
-        impose_entry(
-            self.control_frame.data_source_frame.EFIT_frame.EFIT_field,
-            state['EFIT tree name']
-        )
-        
-        self.control_frame.averaging_frame.time_window_frame.method_state.set(state['time method'])
-        self.control_frame.averaging_frame.time_window_frame.update_method()
-        impose_entry(
-            self.control_frame.averaging_frame.time_window_frame.t_min_box,
-            state['t min']
-        )
-        impose_entry(
-            self.control_frame.averaging_frame.time_window_frame.t_max_box,
-            state['t max']
-        )
-        impose_entry(
-            self.control_frame.averaging_frame.time_window_frame.times_box.times_box,
-            state['times']
-        )
-        # Handle legacy files without this key:
-        try:
-            impose_entry(
-                self.control_frame.averaging_frame.time_window_frame.times_box.times_tol_box,
-                state['times tol']
-            )
-        except KeyError:
-            pass
-        
-        self.control_frame.averaging_frame.method_frame.method_var.set(state['averaging method'])
-        self.control_frame.averaging_frame.method_frame.update_method(state['averaging method'])
-        self.control_frame.averaging_frame.method_frame.error_method_var.set(state['uncertainty method'])
-        self.control_frame.averaging_frame.method_frame.weighted_state.set(state['weighting state'])
-        
-        try:
-            self.control_frame.averaging_frame.fudge_frame.fudge_state.set(state['uncertainty adjust state'])
-            self.control_frame.averaging_frame.fudge_frame.set_state()
-        except KeyError:
-            pass
-        try:
-            self.control_frame.averaging_frame.fudge_frame.fudge_method_var.set(state['uncertainty adjust method'])
-        except KeyError:
-            pass
-        try:
-            self.control_frame.averaging_frame.fudge_frame.fudge_type_var.set(state['uncertainty adjust type'])
-        except KeyError:
-            pass
-        try:
-            impose_entry(
-                self.control_frame.averaging_frame.fudge_frame.fudge_value_box,
-                state['uncertainty adjust value']
-            )
-        except KeyError:
-            pass
-        
-        self.control_frame.kernel_frame.kernel_type_frame.k_var.set(state['kernel type'])
-        self.control_frame.kernel_frame.update_kernel(state['kernel type'])
-        
-        self.control_frame.kernel_frame.kernel_type_frame.core_only_state.set(state['core only state'])
-        
-        for hf, t in zip(
-                self.control_frame.kernel_frame.bounds_frame.hyperprior_frames,
-                state['hyperprior types']
-            ):
-            hf.hp_type_var.set(t)
-        for hf, hhps in zip(
-                self.control_frame.kernel_frame.bounds_frame.hyperprior_frames,
-                state['hyperhyperparameter states']
-            ):
-            for b, v in zip(hf.hyperhyperparameter_frame.boxes, hhps):
-                impose_entry(b, v)
-        
-        self.control_frame.kernel_frame.constraints_frame.core_state.set(state['core constraint state'])
-        self.control_frame.kernel_frame.constraints_frame.update_core()
-        self.control_frame.kernel_frame.constraints_frame.edge_state.set(state['edge constraint state'])
-        self.control_frame.kernel_frame.constraints_frame.update_edge()
-        impose_entry(
-            self.control_frame.kernel_frame.constraints_frame.core_loc,
-            state['core locations']
-        )
-        impose_entry(
-            self.control_frame.kernel_frame.constraints_frame.edge_loc,
-            state['edge locations']
-        )
-        
-        self.control_frame.fitting_frame.method_frame.method_state.set(state['fitting method state'])
-        self.control_frame.fitting_frame.update_method()
-        impose_entry(
-            self.control_frame.fitting_frame.method_frame.starts_box,
-            state['random starts']
-        )
-        
-        impose_entry(
-            self.control_frame.fitting_frame.MCMC_frame.walker_box,
-            state['MCMC walkers']
-        )
-        impose_entry(
-            self.control_frame.fitting_frame.MCMC_frame.sample_box,
-            state['MCMC samples']
-        )
-        impose_entry(
-            self.control_frame.fitting_frame.MCMC_frame.burn_box,
-            state['MCMC burn']
-        )
-        impose_entry(
-            self.control_frame.fitting_frame.MCMC_frame.keep_box,
-            state['MCMC keep']
-        )
-        impose_entry(
-            self.control_frame.fitting_frame.MCMC_frame.a_box,
-            state['MCMC a']
-        )
-        
-        self.control_frame.fitting_frame.MCMC_constraint_frame.full_MC_state.set(state['full MC state'])
-        self.control_frame.fitting_frame.MCMC_constraint_frame.update_full_MC()
-        impose_entry(
-            self.control_frame.fitting_frame.MCMC_constraint_frame.samples_box,
-            state['full MC samples']
-        )
-        self.control_frame.fitting_frame.MCMC_constraint_frame.pos_state.set(state['positivity constraint state'])
-        self.control_frame.fitting_frame.MCMC_constraint_frame.mono_state.set(state['monotonicity constraint state'])
-        
-        self.control_frame.eval_frame.method_state.set(state['evaluation method state'])
-        self.control_frame.eval_frame.update_method()
-        impose_entry(
-            self.control_frame.eval_frame.npts_box,
-            state['num evaluation points']
-        )
-        impose_entry(
-            self.control_frame.eval_frame.x_min_box,
-            state['evaluation x min']
-        )
-        impose_entry(
-            self.control_frame.eval_frame.x_max_box,
-            state['evaluation x max']
-        )
-        impose_entry(
-            self.control_frame.eval_frame.x_points_box,
-            state['evaluation specific x points']
-        )
-        self.control_frame.eval_frame.a_L_state.set(state['compute a/L state'])
-        self.control_frame.eval_frame.update_a_L()
-        self.control_frame.eval_frame.vol_avg_state.set(state['compute volume average state'])
-        self.control_frame.eval_frame.peaking_state.set(state['compute peaking state'])
-        self.control_frame.eval_frame.TCI_state.set(state['compute TCI state'])
-        
-        self.control_frame.outlier_frame.extreme_state.set(state['extreme change rejection state'])
-        self.control_frame.outlier_frame.update_extreme()
-        self.control_frame.outlier_frame.outlier_state.set(state['outlier rejection state'])
-        self.control_frame.outlier_frame.update_outlier()
-        impose_entry(
-            self.control_frame.outlier_frame.extreme_thresh_box,
-            state['extreme change threshold']
-        )
-        impose_entry(
-            self.control_frame.outlier_frame.outlier_thresh_box,
-            state['outlier rejection threshold']
-        )
-        impose_entry(
-            self.control_frame.outlier_frame.specific_box,
-            state['specific flagged points state']
-        )
-        self.control_frame.outlier_frame.show_idx_state.set(state['show idx state'])
-        
-        impose_entry(
-            self.control_frame.plot_param_frame.x_lb_box,
-            state['plot x lb']
-        )
-        impose_entry(
-            self.control_frame.plot_param_frame.x_ub_box,
-            state['plot x ub']
-        )
-        impose_entry(
-            self.control_frame.plot_param_frame.y_lb_box,
-            state['plot y lb']
-        )
-        impose_entry(
-            self.control_frame.plot_param_frame.y_ub_box,
-            state['plot y ub']
-        )
-        impose_entry(
-            self.control_frame.plot_param_frame.dy_lb_box,
-            state['plot dy lb']
-        )
-        impose_entry(
-            self.control_frame.plot_param_frame.dy_ub_box,
-            state['plot dy ub']
-        )
-        impose_entry(
-            self.control_frame.plot_param_frame.aLy_lb_box,
-            state['plot aLy lb']
-        )
-        impose_entry(
-            self.control_frame.plot_param_frame.aLy_ub_box,
-            state['plot aLy ub']
-        )
-        
-        self.master_p = state['master p']
-        self.p = state['p']
-        self.combined_p = state['combined_p']
-        self.X = state['X']
-        self.res = state['res']
-        self.efit_tree = state['efit_tree']
-        self.sampler = state['sampler']
-        self.mean_peaking = state['mean_peaking']
-        self.std_peaking = state['std_peaking']
-        self.mean_vol_avg = state['mean_vol_avg']
-        self.std_vol_avg = state['std_vol_avg']
-        self.extreme_flagged = state['extreme_flagged']
-        self.outlier_flagged = state['outlier_flagged']
-        
-        # Now we can update all of the plots:
-        self.plot_frame.a_val.clear()
-        self.plot_frame.a_grad.clear()
-        self.plot_frame.a_a_L.clear()
-        
-        markercycle = itertools.cycle('o^sDH*')
-        
-        # First, we plot the data points:
-        if self.p is not None:
-            for k, p in self.p.items():
-                if p != []:
-                    p.plot_data(ax=self.plot_frame.a_val, fmt=next(markercycle))
-            
-            # And the flagged outliers:
-            y_bad_c = self.combined_p.y[self.extreme_flagged]
-            X_bad_c = self.combined_p.X[self.extreme_flagged, :].ravel()
-            if len(y_bad_c) > 0:
-                self.plot_frame.a_val.plot(
-                    X_bad_c, y_bad_c, 'mx', label='extreme change', ms=14
-                )
-            
-            self.plot_frame.a_val.set_ylabel(
-                "%s [%s]" % (self.combined_p.y_label, self.combined_p.y_units,)
-                if self.combined_p.y_units
-                else self.combined_p.y_label
-            )
-            
-            # Only update the value axis:
-            try:
-                x_min = float(self.control_frame.plot_param_frame.x_lb_box.get())
-            except ValueError:
-                x_min = self.combined_p.X.min()
-            try:
-                x_max = float(self.control_frame.plot_param_frame.x_ub_box.get())
-            except ValueError:
-                x_max = self.combined_p.X.max()
-            self.plot_frame.a_val.set_xlim(left=x_min, right=x_max)
-            try:
-                y_min = float(self.control_frame.plot_param_frame.y_lb_box.get())
-            except ValueError:
-                y_min = 0
-            try:
-                y_max = float(self.control_frame.plot_param_frame.y_ub_box.get())
-            except ValueError:
-                y_max = None
-            self.plot_frame.a_val.set_ylim(bottom=y_min, top=y_max)
-            
-            self.plot_frame.a_val.legend(loc='best', fontsize=12, ncol=2)
-            
-            # Produce a descriptive title for the plot:
-            title = ''
-            try:
-                title += "shot %d" % (self.combined_p.shot)
-            except AttributeError:
-                pass
-            try:
-                title += " t_min %f" % (self.combined_p.t_min)
-            except AttributeError:
-                pass
-            try:
-                title += " t_max %f" % (self.combined_p.t_max)
-            except AttributeError:
-                pass
-            if hasattr(self.combined_p, 'times'):
-                times = list(self.combined_p.times)
-                title += " times %f" % (times.pop())
-                for t in times:
-                    title += ",%f" % (t,)
-            
-            self.plot_frame.suptitle.set_text(title)
-            
-            self.control_frame.outlier_frame.update_show_idx()
-            # update_show_idx always calls draw, so we don't need to here.
-            # self.plot_frame.canvas.draw()
-            self.plot_frame.canvas._tkcanvas.focus_set()
-            
-            # Then, we plot the outliers:
-            if self.outlier_flagged is not None:
-                X_bad_o = self.combined_p.X[self.outlier_flagged, :].ravel()
-                err_X_bad_o = self.combined_p.err_X[self.outlier_flagged, :].ravel()
-                y_bad_o = self.combined_p.y[self.outlier_flagged]
-                err_y_bad_o = self.combined_p.err_y[self.outlier_flagged]
-                if len(y_bad_o) > 0:
-                    self.plot_frame.a_val.plot(
-                        X_bad_o,
-                        y_bad_o,
-                        'rx',
-                        label='outlier', ms=14
-                    )
-            # Show points that were flagged by the user:
-            s_flagged_idxs = re.findall(
-                LIST_REGEX,
-                self.control_frame.outlier_frame.specific_box.get()
-            )
-            flagged_idxs = set()
-            for s in s_flagged_idxs:
-                try:
-                    i = float(s)
-                    if i >= len(self.combined_p.y):
-                        self.control_frame.status_frame.add_line(
-                            "Value %d out of range, will be ignored." % (i,)
-                        )
-                    else:
-                        flagged_idxs.add(i)
-                except ValueError:
-                    self.control_frame.status_frame.add_line(
-                        "Invalid index to remove '%s', will be ignored." % (s,)
-                    )
-            flagged_idxs = list(flagged_idxs)
-            if self.flagged_plt is not None:
-                for p in self.flagged_plt:
-                    try:
-                        p.remove()
-                    except ValueError:
-                        pass
-            if len(flagged_idxs) > 0:
-                self.flagged_plt = self.plot_frame.a_val.plot(
-                    self.combined_p.X[flagged_idxs, :].ravel(),
-                    self.combined_p.y[flagged_idxs],
-                    'x',
-                    color='orange',
-                    label='flagged',
-                    ms=14
-                )
-            
-            if self.res is not None:
-                self.plot_fit()
     
     def exit(self):
         """Quit the program, cleaning up as needed.
@@ -4810,7 +3583,7 @@ class MCMCResultsFrame(tk.Frame):
             # Loosely based on triangle.py
             for i in range(0, k):
                 self.axes[i, i].clear()
-                self.axes[i, i].hist(flat_trace[:, i], bins=50, color='black')
+                self.axes[i, i].hist(flat_trace[:, i], bins=50)
                 if i == k - 1:
                     self.axes[i, i].set_xlabel(labels[i])
                 if i < k - 1:
@@ -4821,12 +3594,7 @@ class MCMCResultsFrame(tk.Frame):
                 #     self.axes[j, i].set_frame_on(False)
                 for j in range(i + 1, k):
                     self.axes[j, i].clear()
-                    ct, x, y, im = self.axes[j, i].hist2d(
-                        flat_trace[:, i],
-                        flat_trace[:, j],
-                        bins=50,
-                        cmap='gray_r'
-                    )
+                    ct, x, y, im = self.axes[j, i].hist2d(flat_trace[:, i], flat_trace[:, j], bins=50)
                     # xmid = 0.5 * (x[1:] + x[:-1])
                     # ymid = 0.5 * (y[1:] + y[:-1])
                     # self.axes[j, i].contour(xmid, ymid, ct.T, colors='k')
@@ -4839,7 +3607,7 @@ class MCMCResultsFrame(tk.Frame):
                     if j == k - 1:
                         self.axes[j, i].set_xlabel(labels[i])
                 self.axes[-1, i].clear()
-                self.axes[-1, i].plot(sampler.chain[:, :, i].T, alpha=0.1)
+                self.axes[-1, i].plot(sampler.chain[:, :, i].T)
                 self.axes[-1, i].axvline(burn, color='r', linewidth=3)
                 self.axes[-1, i].set_ylabel(labels[i])
                 self.axes[-1, i].set_xlabel('step')
@@ -4942,11 +3710,6 @@ looks correct.
             0,
             self.master.master.control_frame.fitting_frame.MCMC_frame.keep_box.get()
         )
-        self.entry_frame.a_box.delete(0, tk.END)
-        self.entry_frame.a_box.insert(
-            0,
-            self.master.master.control_frame.fitting_frame.MCMC_frame.a_box.get()
-        )
         
         # Input hyperparameter bounds:
         self.bounds_meta_frame = tk.Frame(self, **FRAME_PARAMS)
@@ -4964,48 +3727,55 @@ looks correct.
         
         self.bounds_meta_frame.grid(row=2, column=0, sticky='EW')
         
-        self.bounds_meta_frame.grid_columnconfigure(0, weight=1)
-        
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         
-        self.get_hyperprior_from_master()
+        self.process_bounds()
     
-    def get_hyperprior_from_master(self):
-        """Fetch the hyperprior details from the parent Frame.
+    def process_bounds(self):
+        """Process the hyperparameter bounds and propagate back to the parent Frame.
         """
-        for hf_self, hf_master in zip(
-                self.bounds_frame.hyperprior_frames,
-                self.master.master.control_frame.kernel_frame.bounds_frame.hyperprior_frames
-            ):
-            hf_self.hp_type_var.set(hf_master.hp_type)
-            hf_self.update_hp_type(hf_self.hp_type_var.get())
-            for hhpb_self, hhpb_master in zip(
-                    hf_self.hyperhyperparameter_frame.boxes,
-                    hf_master.hyperhyperparameter_frame.boxes
-                ):
-                hhpb_self.delete(0, tk.END)
-                hhpb_self.insert(0, hhpb_master.get())
-    
-    def send_hyperprior_to_master(self):
-        """Send the hyperprior details back to the master Frame and call :py:meth:`FitWindow.process_bounds`.
-        """
-        for hf_self, hf_master in zip(
-                self.bounds_frame.hyperprior_frames,
-                self.master.master.control_frame.kernel_frame.bounds_frame.hyperprior_frames
-            ):
-            hf_master.hp_type_var.set(hf_self.hp_type)
-            hf_master.update_hp_type(hf_master.hp_type_var.get())
-            for hhpb_self, hhpb_master in zip(
-                    hf_self.hyperhyperparameter_frame.boxes,
-                    hf_master.hyperhyperparameter_frame.boxes
-                ):
-                hhpb_master.delete(0, tk.END)
-                hhpb_master.insert(0, hhpb_self.get())
+        for k, l, u in zip(list(range(0, len(self.master.master.combined_p.gp.free_param_bounds))),
+                           self.bounds_frame.lower_bounds,
+                           self.bounds_frame.upper_bounds):
+            # We know that by the point this gets called, the hyperprior has the right bounds as set in the main window:
+            old_bounds = self.master.master.combined_p.gp.free_param_bounds[k]
+            new_bounds = list(old_bounds)
+            
+            new_lb = l.get()
+            try:
+                new_bounds[0] = float(new_lb)
+            except ValueError:
+                if new_lb == '':
+                    l.insert(0, str(old_bounds[0]))
+                else:
+                    self.help_box.add_line(
+                        "Invalid lower bound %s for %s, will use default value "
+                        "instead." % (new_lb, k,)
+                    )
+                
+            new_ub = u.get()
+            try:
+                new_bounds[1] = float(new_ub)
+            except ValueError:
+                if new_ub == '':
+                    u.insert(0, str(old_bounds[1]))
+                else:
+                    self.help_box.add_line(
+                        "Invalid upper bound %s for %s, will use default value "
+                        "instead." % (new_ub, k,)
+                    )
+            
+            self.master.master.combined_p.gp.free_param_bounds[k] = new_bounds
         
-        return self.master.master.process_bounds()
+        # Propagate the bounds back to the main window:
+        for l, u in zip(self.master.master.control_frame.kernel_frame.bounds_frame.lower_bounds,
+                        self.master.master.control_frame.kernel_frame.bounds_frame.upper_bounds):
+            l.delete(0, tk.END)
+            u.delete(0, tk.END)
+        self.master.master.process_bounds()
     
-    def update_MCMC_params(self, walkers=True, sample=True, burn=True, thin=True, a=True):
+    def update_MCMC_params(self, walkers=True, sample=True, burn=True, thin=True):
         """Update the MCMC parameters and propagate back to the parent Frame.
         """
         if walkers:
@@ -5032,35 +3802,29 @@ looks correct.
                 0,
                 self.entry_frame.keep_box.get()
             )
-        if a:
-            self.master.master.control_frame.fitting_frame.MCMC_frame.a_box.delete(0, tk.END)
-            self.master.master.control_frame.fitting_frame.MCMC_frame.a_box.insert(
-                0,
-                self.entry_frame.a_box.get()
-            )
     
     def continue_(self):
         """Accept the samples and evaluate.
         """
         self.help_box.add_line("Continuing...")
-        self.send_hyperprior_to_master()
+        self.process_bounds()
         self.update_MCMC_params()
-        self.master.destroy(good=True)
+        self.master.destroy()
     
     def abort(self):
         """Reject the samples and return to the parent window.
         """
         self.help_box.add_line("Aborting evaluation...")
-        self.send_hyperprior_to_master()
-        # self.master.master.sampler.pool.close()
-        # self.master.master.sampler = None
-        self.master.destroy(good=False)
+        self.process_bounds()
+        self.master.master.sampler.pool.close()
+        self.master.master.sampler = None
+        self.master.destroy()
     
     def resample(self):
         """Re-run the sampler with new hyperparameters.
         """
         self.help_box.add_line("Re-running MCMC sampler...")
-        self.send_hyperprior_to_master()
+        self.process_bounds()
         self.update_MCMC_params()
         try:
             self.master.master.sampler.pool.close()
@@ -5103,138 +3867,62 @@ class MCMCWindow(tk.Toplevel):
         
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
-    
-    def destroy(self, good=False):
-        if not good:
-            self.master.sampler.pool.close()
-            self.master.sampler = None
-        tk.Toplevel.destroy(self)
 
-def impose_entry(w, v):
-    """Impose value `v` on :py:class:`tk.Entry` `w`, leaving `w` in its previous state.
-    """
-    s = w.cget('state')
-    w.config(state=tk.NORMAL)
-    w.delete(0, tk.END)
-    w.insert(0, v)
-    w.config(state=s)
 
-def run_gui(argv=None):
-    global args
-    if argv is not None:
-        args = parser.parse_args(argv)
+if __name__ == "__main__":
     root = FitWindow()
     
-    if args.load:
-        root.load_state(path=args.load)
-    else:
-        # Set the defaults HERE so we don't clobber what's in the file:
-        # Populate the GUI with parameters from args:
-        if not args.kernel:
-            if args.core_only:
-                args.kernel = 'SE'
-            else:
-                args.kernel = 'gibbstanh'
-        elif args.kernel == 'SEsym1d':
-            args.no_core_constraint = True
-        
-        # Turn off edge constraint for --core-only:
+    # Populate the GUI with parameters from args:
+    if not args.kernel:
         if args.core_only:
-            args.no_edge_constraint = True
-        
-        # Bump random starts up to 4 for low processor count machines:
-        if not args.random_starts:
-            num_proc = multiprocessing.cpu_count()
-            if num_proc < 4:
-                args.random_starts = 4
-            else:
-                args.random_starts = min(num_proc, 20)
+            args.kernel = 'SE'
+        else:
+            args.kernel = 'gibbstanh'
+    elif args.kernel == 'SEsym1d':
+        args.no_core_constraint = True
+    
+    # Turn off edge constraint for --core-only:
+    if args.core_only:
+        args.no_edge_constraint = True
+
+    # Bump random starts up to 4 for low processor count machines:
+    if not args.random_starts:
+        num_proc = multiprocessing.cpu_count()
+        if num_proc < 4:
+            args.random_starts = 4
+        else:
+            args.random_starts = min(num_proc, 20)
     
     if args.signal:
-        root.control_frame.data_source_frame.tree_file_frame.source_state.set(
-            root.control_frame.data_source_frame.tree_file_frame.TREE_MODE
-        )
-        root.control_frame.data_source_frame.update_source()
         root.control_frame.data_source_frame.signal_coordinate_frame.signal_var.set(args.signal)
         root.control_frame.data_source_frame.update_signal(args.signal)
     if args.shot is not None:
-        impose_entry(
-            root.control_frame.data_source_frame.shot_frame.shot_box,
-            str(args.shot)
-        )
+        root.control_frame.data_source_frame.shot_frame.shot_box.delete(0, tk.END)
+        root.control_frame.data_source_frame.shot_frame.shot_box.insert(0, str(args.shot))
     if args.t_min is not None:
-        root.control_frame.averaging_frame.time_window_frame.method_state.set(
-            root.control_frame.averaging_frame.time_window_frame.WINDOW_MODE
-        )
-        root.control_frame.averaging_frame.time_window_frame.update_method()
-        impose_entry(
-            root.control_frame.averaging_frame.time_window_frame.t_min_box,
-            str(args.t_min)
-        )
+        root.control_frame.averaging_frame.time_window_frame.t_min_box.delete(0, tk.END)
+        root.control_frame.averaging_frame.time_window_frame.t_min_box.insert(0, str(args.t_min))
     if args.t_max is not None:
-        root.control_frame.averaging_frame.time_window_frame.method_state.set(
-            root.control_frame.averaging_frame.time_window_frame.WINDOW_MODE
-        )
-        root.control_frame.averaging_frame.time_window_frame.update_method()
-        impose_entry(
-            root.control_frame.averaging_frame.time_window_frame.t_max_box,
-            str(args.t_max)
-        )
+        root.control_frame.averaging_frame.time_window_frame.t_max_box.delete(0, tk.END)
+        root.control_frame.averaging_frame.time_window_frame.t_max_box.insert(0, str(args.t_max))
     if args.t_points:
-        root.control_frame.averaging_frame.time_window_frame.method_state.set(
-            root.control_frame.averaging_frame.time_window_frame.POINT_MODE
-        )
-        root.control_frame.averaging_frame.time_window_frame.update_method()
-        impose_entry(
-            root.control_frame.averaging_frame.time_window_frame.times_box.times_box,
-            str(args.t_points)[1:-1]
-        )
-    if args.t_tol:
-        impose_entry(
-            root.control_frame.averaging_frame.time_window_frame.times_box.times_tol_box,
-            str(args.t_tol)
-        )
+        root.control_frame.averaging_frame.time_window_frame.point_button.invoke()
+        root.control_frame.averaging_frame.time_window_frame.times_box.delete(0, tk.END)
+        root.control_frame.averaging_frame.time_window_frame.times_box.insert(0, str(args.t_points)[1:-1])
     if args.npts is not None:
-        root.control_frame.eval_frame.method_state.set(
-            root.control_frame.eval_frame.UNIFORM_GRID
-        )
-        root.control_frame.eval_frame.update_method()
-        impose_entry(
-            root.control_frame.eval_frame.npts_box,
-            str(args.npts)
-        )
+        root.control_frame.eval_frame.npts_box.delete(0, tk.END)
+        root.control_frame.eval_frame.npts_box.insert(0, str(args.npts))
     if args.x_min is not None:
-        root.control_frame.eval_frame.method_state.set(
-            root.control_frame.eval_frame.UNIFORM_GRID
-        )
-        root.control_frame.eval_frame.update_method()
-        impose_entry(
-            root.control_frame.eval_frame.x_min_box,
-            str(args.x_min)
-        )
+        root.control_frame.eval_frame.x_min_box.delete(0, tk.END)
+        root.control_frame.eval_frame.x_min_box.insert(0, str(args.x_min))
     if args.x_max is not None:
-        root.control_frame.eval_frame.method_state.set(
-            root.control_frame.eval_frame.UNIFORM_GRID
-        )
-        root.control_frame.eval_frame.update_method()
-        impose_entry(
-            root.control_frame.eval_frame.x_max_box,
-            str(args.x_max)
-        )
+        root.control_frame.eval_frame.x_max_box.delete(0, tk.END)
+        root.control_frame.eval_frame.x_max_box.insert(0, str(args.x_max))
     if args.x_pts:
-        root.control_frame.eval_frame.method_state.set(
-            root.control_frame.eval_frame.POINTS
-        )
-        root.control_frame.eval_frame.update_method()
-        impose_entry(
-            root.control_frame.eval_frame.x_points_box,
-            str(args.x_pts)[1:-1]
-        )
+        root.control_frame.eval_frame.points_button.invoke()
+        root.control_frame.eval_frame.x_points_box.delete(0, tk.END)
+        root.control_frame.eval_frame.x_points_box.insert(0, str(args.x_pts)[1:-1])
     if args.system:
-        root.control_frame.data_source_frame.tree_file_frame.source_state.set(
-            root.control_frame.data_source_frame.tree_file_frame.TREE_MODE
-        )
-        root.control_frame.data_source_frame.update_source()
         systems = set(args.system)
         if 'TS' in systems:
             systems.remove('TS')
@@ -5245,42 +3933,17 @@ def run_gui(argv=None):
                 b.button.select()
             else:
                 b.button.deselect()
-            if b.system == 'TCI':
-                b.invoke_TCI()
-    if args.TCI_quad_points:
-        impose_entry(
-            root.control_frame.data_source_frame.TCI_frame.TCI_points_box,
-            str(args.TCI_quad_points)
-        )
-    if args.TCI_thin:
-        impose_entry(
-            root.control_frame.data_source_frame.TCI_frame.TCI_thin_box,
-            str(args.TCI_thin)
-        )
-    if args.TCI_ds:
-        impose_entry(
-            root.control_frame.data_source_frame.TCI_frame.TCI_ds_box,
-            str(args.TCI_ds)
-        )
     if args.kernel:
         root.control_frame.kernel_frame.kernel_type_frame.k_var.set(args.kernel)
         root.control_frame.kernel_frame.update_kernel(args.kernel)
     if args.coordinate:
         root.control_frame.data_source_frame.signal_coordinate_frame.coordinate_var.set(args.coordinate)
     if args.core_constraint_location is not None:
-        root.control_frame.kernel_frame.constraints_frame.core_button.select()
-        root.control_frame.kernel_frame.constraints_frame.update_core()
-        impose_entry(
-            root.control_frame.kernel_frame.constraints_frame.core_loc,
-            str(args.core_constraint_location)[1:-1]
-        )
+        root.control_frame.kernel_frame.constraints_frame.core_loc.delete(0, tk.END)
+        root.control_frame.kernel_frame.constraints_frame.core_loc.insert(0, str(args.core_constraint_location)[1:-1])
     if args.edge_constraint_locations:
-        root.control_frame.kernel_frame.constraints_frame.edge_button.select()
-        root.control_frame.kernel_frame.constraints_frame.update_edge()
-        impose_entry(
-            root.control_frame.kernel_frame.constraints_frame.edge_loc,
-            str(args.edge_constraint_locations)[1:-1]
-        )
+        root.control_frame.kernel_frame.constraints_frame.edge_loc.delete(0, tk.END)
+        root.control_frame.kernel_frame.constraints_frame.edge_loc.insert(0, str(args.edge_constraint_locations)[1:-1])
     if args.no_core_constraint:
         root.control_frame.kernel_frame.constraints_frame.core_button.deselect()
         root.control_frame.kernel_frame.constraints_frame.update_core()
@@ -5295,147 +3958,68 @@ def run_gui(argv=None):
         root.control_frame.averaging_frame.method_frame.method_var.set('robust')
     if args.all_points:
         root.control_frame.averaging_frame.method_frame.method_var.set('all points')
-        root.control_frame.averaging_frame.method_frame.update_method('all points')
-    if args.uncertainty_method:
-        root.control_frame.averaging_frame.method_frame.error_method_var.set(args.uncertainty_method.replace('_', ' '))
-        root.control_frame.averaging_frame.method_frame.update_method(
-            root.control_frame.averaging_frame.method_frame.method_var.get()
-        )
-    if args.uncertainty_adjust_value:
-        root.control_frame.averaging_frame.fudge_frame.fudge_button.select()
-        root.control_frame.averaging_frame.fudge_frame.set_state()
-        impose_entry(
-            root.control_frame.averaging_frame.fudge_frame.fudge_value_box,
-            str(args.uncertainty_adjust_value)
-        )
-    if args.uncertainty_adjust_method:
-        root.control_frame.averaging_frame.fudge_frame.fudge_method_var.set(
-            args.uncertainty_adjust_method
-        )
-    if args.uncertainty_adjust_type:
-        root.control_frame.averaging_frame.fudge_frame.fudge_type_var.set(
-            args.uncertainty_adjust_type
-        )
+    root.control_frame.averaging_frame.method_frame.error_method_var.set(args.uncertainty_method.replace('_', ' '))
+    root.control_frame.averaging_frame.method_frame.update_method(
+        root.control_frame.averaging_frame.method_frame.method_var.get()
+    )
     if args.change_threshold is not None:
-        root.control_frame.outlier_frame.extreme_button.select()
-        root.control_frame.outlier_frame.update_extreme()
-        impose_entry(
-            root.control_frame.outlier_frame.extreme_thresh_box,
-            str(args.change_threshold)
-        )
+        root.control_frame.outlier_frame.extreme_button.invoke()
+        root.control_frame.outlier_frame.extreme_thresh_box.delete(0, tk.END)
+        root.control_frame.outlier_frame.extreme_thresh_box.insert(0, str(args.change_threshold))
     if args.outlier_threshold is not None:
-        root.control_frame.outlier_frame.outlier_button.select()
-        root.control_frame.outlier_frame.update_outlier()
-        impose_entry(
-            root.control_frame.outlier_frame.outlier_thresh_box,
-            str(args.outlier_threshold)
-        )
+        root.control_frame.outlier_frame.outlier_button.invoke()
+        root.control_frame.outlier_frame.outlier_thresh_box.delete(0, tk.END)
+        root.control_frame.outlier_frame.outlier_thresh_box.insert(0, str(args.outlier_threshold))
     if args.random_starts is not None:
-        impose_entry(
-            root.control_frame.fitting_frame.method_frame.starts_box,
-            str(args.random_starts)
-        )
-    if args.hyperprior:
-        hp = list(args.hyperprior)
-        kernel = root.control_frame.kernel_frame.kernel_type_frame.k_var.get()
-        valid_names = list(HYPERPARAMETERS[kernel].keys())
-        while hp:
-            name = HYPERPARAMETER_NAMES[hp.pop(0)]
-            name_idx = valid_names.index(name)
-            dist_name = hp.pop(0)
-            param_count = len(HYPERPRIORS[dist_name])
-            hpf = root.control_frame.kernel_frame.bounds_frame.hyperprior_frames[name_idx]
-            hpf.hp_type_var.set(dist_name)
-            hpf.update_hp_type(dist_name)
-            
-            for k in range(0, param_count):
-                impose_entry(
-                    hpf.hyperhyperparameter_frame.boxes[k],
-                    hp.pop(0)
-                )
-    elif args.bounds:
-        for k, hf in zip(
-                range(0, len(root.control_frame.kernel_frame.bounds_frame.hyperprior_frames)),
-                root.control_frame.kernel_frame.bounds_frame.hyperprior_frames
-            ):
-            hf.hp_type_var.set('uniform')
-            hf.update_hp_type('uniform')
-            impose_entry(
-                hf.hyperhyperparameter_frame.boxes[0],
-                str(args.bounds[2 * k])
-            )
-            impose_entry(
-                hf.hyperhyperparameter_frame.boxes[1],
-                str(args.bounds[2 * k + 1])
-            )
-    if args.input_filename or args.abscissa_name or args.ordinate_name or args.metadata_lines:
-        root.control_frame.data_source_frame.tree_file_frame.source_state.set(
-            root.control_frame.data_source_frame.tree_file_frame.FILE_MODE
-        )
-        root.control_frame.data_source_frame.update_source()
+        root.control_frame.fitting_frame.method_frame.starts_box.delete(0, tk.END)
+        root.control_frame.fitting_frame.method_frame.starts_box.insert(0, str(args.random_starts))
+    if args.bounds:
+        for k in range(0, len(root.control_frame.kernel_frame.bounds_frame.lower_bounds)):
+            root.control_frame.kernel_frame.bounds_frame.lower_bounds[k].delete(0, tk.END)
+            root.control_frame.kernel_frame.bounds_frame.lower_bounds[k].insert(0, str(args.bounds[2*k]))
+            root.control_frame.kernel_frame.bounds_frame.upper_bounds[k].delete(0, tk.END)
+            root.control_frame.kernel_frame.bounds_frame.upper_bounds[k].insert(0, str(args.bounds[2*k+1]))
     if args.input_filename:
-        impose_entry(
-            root.control_frame.data_source_frame.tree_file_frame.path_entry,
-            args.input_filename
-        )
+        root.control_frame.data_source_frame.tree_file_frame.file_button.invoke()
+        root.control_frame.data_source_frame.tree_file_frame.path_entry.delete(0, tk.END)
+        root.control_frame.data_source_frame.tree_file_frame.path_entry.insert(0, args.input_filename)
     if args.abscissa_name:
+        root.control_frame.data_source_frame.tree_file_frame.file_button.invoke()
         if len(args.abscissa_name) == 2:
-            impose_entry(
-                root.control_frame.data_source_frame.variable_name_frame.time_box,
-                str(args.abscissa_name[0])
-            )
-        impose_entry(
-            root.control_frame.data_source_frame.variable_name_frame.space_box,
-            str(args.abscissa_name[-1])
-        )
+            root.control_frame.data_source_frame.variable_name_frame.time_box.delete(0, tk.END)
+            root.control_frame.data_source_frame.variable_name_frame.time_box.insert(0, str(args.abscissa_name[0]))
+        root.control_frame.data_source_frame.variable_name_frame.space_box.delete(0, tk.END)
+        root.control_frame.data_source_frame.variable_name_frame.space_box.insert(0, str(args.abscissa_name[-1]))
     if args.ordinate_name:
-        impose_entry(
-            root.control_frame.data_source_frame.variable_name_frame.data_box,
-            str(args.ordinate_name)
-        )
+        root.control_frame.data_source_frame.tree_file_frame.file_button.invoke()
+        root.control_frame.data_source_frame.variable_name_frame.data_box.delete(0, tk.END)
+        root.control_frame.data_source_frame.variable_name_frame.data_box.insert(0, str(args.ordinate_name))
     if args.metadata_lines is not None:
-        impose_entry(
-            root.control_frame.data_source_frame.variable_name_frame.meta_box,
-            str(args.metadata_lines)
-        )
-    if args.use_MCMC or args.walkers or args.MCMC_samp or args.burn or args.keep or args.sampler_a:
-        root.control_frame.fitting_frame.method_frame.method_state.set(
-            root.control_frame.fitting_frame.method_frame.USE_MCMC
-        )
-        root.control_frame.fitting_frame.update_method()
+        root.control_frame.data_source_frame.variable_name_frame.meta_box.delete(0, tk.END)
+        root.control_frame.data_source_frame.variable_name_frame.meta_box.insert(0, str(args.metadata_lines))
+    if args.use_MCMC:
+        root.control_frame.fitting_frame.method_frame.MCMC_button.invoke()
     if args.walkers is not None:
-        impose_entry(
-            root.control_frame.fitting_frame.MCMC_frame.walker_box,
-            str(args.walkers)
-        )
+        root.control_frame.fitting_frame.MCMC_frame.walker_box.delete(0, tk.END)
+        root.control_frame.fitting_frame.MCMC_frame.walker_box.insert(0, str(args.walkers))
     if args.MCMC_samp is not None:
-        impose_entry(
-            root.control_frame.fitting_frame.MCMC_frame.sample_box,
-            str(args.MCMC_samp)
-        )
+        root.control_frame.fitting_frame.MCMC_frame.sample_box.delete(0, tk.END)
+        root.control_frame.fitting_frame.MCMC_frame.sample_box.insert(0, str(args.MCMC_samp))
     if args.burn is not None:
-        impose_entry(
-            root.control_frame.fitting_frame.MCMC_frame.burn_box,
-            str(args.burn)
-        )
+        root.control_frame.fitting_frame.MCMC_frame.burn_box.delete(0, tk.END)
+        root.control_frame.fitting_frame.MCMC_frame.burn_box.insert(0, str(args.burn))
     if args.keep is not None:
-        impose_entry(
-            root.control_frame.fitting_frame.MCMC_frame.keep_box,
-            str(args.keep)
-        )
-    if args.sampler_a is not None:
-        impose_entry(
-            root.control_frame.fitting_frame.MCMC_frame.a_box,
-            str(args.sampler_a)
-        )
-    if args.full_monte_carlo or args.monte_carlo_samples or args.reject_negative or args.reject_non_monotonic:
+        root.control_frame.fitting_frame.MCMC_frame.keep_box.delete(0, tk.END)
+        root.control_frame.fitting_frame.MCMC_frame.keep_box.insert(0, str(args.keep))
+    if args.full_monte_carlo:
         root.control_frame.fitting_frame.MCMC_constraint_frame.full_MC_button.select()
         root.control_frame.fitting_frame.MCMC_constraint_frame.update_full_MC()
     if args.monte_carlo_samples:
-        impose_entry(
-            root.control_frame.fitting_frame.MCMC_constraint_frame.samples_box,
-            str(args.monte_carlo_samples)
-        )
+        state = root.control_frame.fitting_frame.MCMC_constraint_frame.samples_box['state']
+        root.control_frame.fitting_frame.MCMC_constraint_frame.samples_box.config(state=tk.NORMAL)
+        root.control_frame.fitting_frame.MCMC_constraint_frame.samples_box.delete(0, tk.END)
+        root.control_frame.fitting_frame.MCMC_constraint_frame.samples_box.insert(0, str(args.monte_carlo_samples))
+        root.control_frame.fitting_frame.MCMC_constraint_frame.samples_box.config(state=state)
     if args.reject_negative:
         root.control_frame.fitting_frame.MCMC_constraint_frame.pos_button.select()
     if args.reject_non_monotonic:
@@ -5450,73 +4034,30 @@ def run_gui(argv=None):
     if args.compute_TCI:
         root.control_frame.eval_frame.TCI_button.select()
     if args.x_lim:
-        impose_entry(
-            root.control_frame.plot_param_frame.x_lb_box,
-            str(args.x_lim[0])
-        )
-        impose_entry(
-            root.control_frame.plot_param_frame.x_ub_box,
-            str(args.x_lim[1])
-        )
+        root.control_frame.plot_param_frame.x_lb_box.delete(0, tk.END)
+        root.control_frame.plot_param_frame.x_lb_box.insert(0, str(args.x_lim[0]))
+        root.control_frame.plot_param_frame.x_ub_box.delete(0, tk.END)
+        root.control_frame.plot_param_frame.x_ub_box.insert(0, str(args.x_lim[1]))
     if args.y_lim:
-        impose_entry(
-            root.control_frame.plot_param_frame.y_lb_box,
-            str(args.y_lim[0])
-        )
-        impose_entry(
-            root.control_frame.plot_param_frame.y_ub_box,
-            str(args.y_lim[1])
-        )
-    if args.dy_lim:
-        impose_entry(
-            root.control_frame.plot_param_frame.dy_lb_box,
-            str(args.dy_lim[0])
-        )
-        impose_entry(
-            root.control_frame.plot_param_frame.dy_ub_box,
-            str(args.dy_lim[1])
-        )
-    if args.aLy_lim:
-        impose_entry(
-            root.control_frame.plot_param_frame.aLy_lb_box,
-            str(args.aLy_lim[0])
-        )
-        impose_entry(
-            root.control_frame.plot_param_frame.aLy_ub_box,
-            str(args.aLy_lim[1])
-        )
+        root.control_frame.plot_param_frame.y_lb_box.delete(0, tk.END)
+        root.control_frame.plot_param_frame.y_lb_box.insert(0, str(args.y_lim[0]))
+        root.control_frame.plot_param_frame.y_ub_box.delete(0, tk.END)
+        root.control_frame.plot_param_frame.y_ub_box.insert(0, str(args.y_lim[1]))
     if args.EFIT_tree:
-        impose_entry(
-            root.control_frame.data_source_frame.EFIT_frame.EFIT_field,
-            args.EFIT_tree
-        )
+        root.control_frame.data_source_frame.EFIT_frame.EFIT_field.delete(0, tk.END)
+        root.control_frame.data_source_frame.EFIT_frame.EFIT_field.insert(0, args.EFIT_tree)
     if args.plot_idxs:
         root.control_frame.outlier_frame.show_idx_button.select()
     if args.remove_points:
-        impose_entry(
-            root.control_frame.outlier_frame.specific_box,
-            str(args.remove_points)[1:-1]
-        )
+        root.control_frame.outlier_frame.specific_box.insert(0, str(args.remove_points)[1:-1])
     
-    root.save_state = not args.no_save_state
-    root.save_cov = args.cov_in_save_state
-    root.save_sampler = args.sampler_in_save_state
-
     if args.full_auto or args.no_interaction:
         root.load_data()
         root.average_data()
         root.fit_data()
-
         if args.no_interaction:
             root.save_fit(save_plot=True)
             root.exit()
-    
+        
     if not args.no_interaction and not args.no_mainloop:
         root.mainloop()
-        
-        return (root.X, root.res, root.combined_p)
-    else:
-        return root
-
-if __name__ == "__main__":
-    root = run_gui()
