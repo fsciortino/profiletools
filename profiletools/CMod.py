@@ -32,16 +32,16 @@ try:
 except ImportError:
     warnings.warn("Module MDSplus could not be loaded!", RuntimeWarning)
 try:
-    import eqtools3 as eqtools
+    import eqtools
 except ImportError:
     warnings.warn("Module eqtools could not be loaded!", RuntimeWarning)
 import scipy
 import scipy.interpolate
 import scipy.stats
-import gptools3 as gptools
+import gptools
 import matplotlib.pyplot as plt
 try:
-    import TRIPPy3 as TRIPPy
+    import TRIPPy
 except ImportError:
     warnings.warn("Module TRIPPy could not be loaded!", RuntimeWarning)
 

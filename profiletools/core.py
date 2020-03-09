@@ -29,7 +29,7 @@ import scipy.io
 import scipy.linalg
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import gptools3 as gptools
+import gptools
 import sys
 import os.path
 import csv

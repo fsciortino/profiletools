@@ -677,9 +677,9 @@ import tkinter.font
 import tkinter.ttk
 import time
 import multiprocessing
-import profiletools3 as profiletools
-import gptools3 as gptools
-import eqtools3 as eqtools
+import profiletools
+import gptools
+import eqtools
 import MDSplus
 import os.path
 import copy
